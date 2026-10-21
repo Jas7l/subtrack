@@ -1,0 +1,27 @@
+# Binaries
+/bin/
+*.exe
+*.test
+*.out
+# `go build -o server ./cmd/server` drops the binary at the repo root. Anchored
+# with a leading slash so it does not also match the internal/server/ package.
+/server
+
+# Env / local config
+.env
+.env.local
+
+# IDE
+/.idea/
+/.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage.out
+coverage.html
+
+.claude
