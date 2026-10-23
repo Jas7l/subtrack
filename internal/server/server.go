@@ -24,6 +24,7 @@ import (
 	"subtrack/internal/scheduler"
 	"subtrack/internal/settings"
 	"subtrack/internal/subscription"
+	"subtrack/internal/transaction"
 	"subtrack/internal/user"
 )
 
@@ -65,12 +66,14 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	auth.RegisterRoutes(api, protected, authSvc)
 	user.RegisterRoutes(protected, user.New(users, depts, tx, trail))
 	department.RegisterRoutes(protected, department.New(depts, users, tx, trail))
-	subs := subscription.New(subscription.NewStore(pool), users, depts, tx, trail)
+	subStore := subscription.NewStore(pool)
+	subs := subscription.New(subStore, users, depts, tx, trail)
 	subscription.RegisterRoutes(protected, subs)
 	request.RegisterRoutes(protected, request.New(request.NewStore(pool), depts, subs, tx, trail, inbox))
 	notification.RegisterRoutes(protected, notification.New(inbox))
 	audit.RegisterRoutes(protected, audit.New(trail))
 	settings.RegisterRoutes(protected, settings.New(settings.NewStore(pool), tx, trail))
+	transaction.RegisterRoutes(protected, transaction.New(transaction.NewStore(pool), subStore, tx, trail))
 	return nil
 }
 

@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -63,6 +64,15 @@ func TestPlan(t *testing.T) {
 			want: []event{{kind: evExpired, status: domain.SubExpired, key: "sub_3_expired_2026-10-01"}},
 		},
 		{
+			name: "missed payments before the end are charged, then it expires",
+			sub: domain.Subscription{ID: 3, Status: domain.SubActive, BillingPeriod: domain.BillingMonth,
+				EndDate: dayPtr("2026-10-10"), NextPaymentDate: dayPtr("2026-09-05")},
+			want: []event{
+				{kind: evCharge, charge: []time.Time{day("2026-09-05"), day("2026-10-05")}, next: day("2026-11-05")},
+				{kind: evExpired, status: domain.SubExpired, key: "sub_3_expired_2026-10-10"},
+			},
+		},
+		{
 			name: "expiring_soon moved away goes back to active",
 			sub:  domain.Subscription{ID: 4, Status: domain.SubExpiringSoon, EndDate: dayPtr("2027-10-23")},
 			want: []event{{kind: evRenewed, status: domain.SubActive}},
@@ -75,16 +85,31 @@ func TestPlan(t *testing.T) {
 		{
 			name: "payment within the window",
 			sub:  domain.Subscription{ID: 5, Status: domain.SubActive, NextPaymentDate: dayPtr("2026-10-26")},
-			want: []event{{kind: evPayment, key: "sub_5_payment_2026-10-26"}},
+			want: []event{{kind: evPayment, key: "sub_5_payment_2026-10-26", next: day("2026-10-26")}},
 		},
 		{
-			name: "payment today",
-			sub:  domain.Subscription{ID: 5, Status: domain.SubActive, NextPaymentDate: dayPtr("2026-10-23")},
-			want: []event{{kind: evPayment, key: "sub_5_payment_2026-10-23"}},
+			name: "payment today is charged and reminded",
+			sub: domain.Subscription{ID: 5, Status: domain.SubActive, BillingPeriod: domain.BillingQuarter,
+				NextPaymentDate: dayPtr("2026-10-23")},
+			want: []event{
+				{kind: evCharge, charge: []time.Time{day("2026-10-23")}, next: day("2027-01-23")},
+				{kind: evPayment, key: "sub_5_payment_2026-10-23", next: day("2026-10-23")},
+			},
 		},
 		{
-			name: "payment past is not reminded",
-			sub:  domain.Subscription{ID: 5, Status: domain.SubActive, NextPaymentDate: dayPtr("2026-10-22")},
+			name: "payment yesterday is charged, not reminded",
+			sub: domain.Subscription{ID: 5, Status: domain.SubActive, BillingPeriod: domain.BillingYear,
+				NextPaymentDate: dayPtr("2026-10-22")},
+			want: []event{{kind: evCharge, charge: []time.Time{day("2026-10-22")}, next: day("2027-10-22")}},
+		},
+		{
+			name: "missed months are each charged and the new date is reminded",
+			sub: domain.Subscription{ID: 5, Status: domain.SubActive, BillingPeriod: domain.BillingMonth,
+				NextPaymentDate: dayPtr("2026-08-25")},
+			want: []event{
+				{kind: evCharge, charge: []time.Time{day("2026-08-25"), day("2026-09-25")}, next: day("2026-10-25")},
+				{kind: evPayment, key: "sub_5_payment_2026-10-25", next: day("2026-10-25")},
+			},
 		},
 		{
 			name: "payment beyond the window",
@@ -102,7 +127,7 @@ func TestPlan(t *testing.T) {
 				NextPaymentDate: dayPtr("2026-10-24")},
 			want: []event{
 				{kind: evExpiring, status: domain.SubExpiringSoon, key: "sub_7_expiring_2026-10-28"},
-				{kind: evPayment, key: "sub_7_payment_2026-10-24"},
+				{kind: evPayment, key: "sub_7_payment_2026-10-24", next: day("2026-10-24")},
 			},
 		},
 		{
@@ -118,13 +143,8 @@ func TestPlan(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			got := plan(c.sub, today, st)
-			if len(got) != len(c.want) {
-				t.Fatalf("plan = %+v, want %+v", got, c.want)
-			}
-			for i := range got {
-				if got[i] != c.want[i] {
-					t.Errorf("event %d = %+v, want %+v", i, got[i], c.want[i])
-				}
+			if !reflect.DeepEqual(got, c.want) {
+				t.Errorf("plan =\n  %+v\nwant\n  %+v", got, c.want)
 			}
 		})
 	}
@@ -138,8 +158,39 @@ func TestPlanZeroDays(t *testing.T) {
 		t.Fatalf("tomorrow with 0 days: plan = %+v, want nothing", got)
 	}
 	sub.EndDate, sub.NextPaymentDate = dayPtr("2026-10-23"), dayPtr("2026-10-23")
-	if got := plan(sub, today, st); len(got) != 2 {
-		t.Fatalf("today with 0 days: plan = %+v, want expiring and payment", got)
+	got := plan(sub, today, st)
+	if len(got) != 3 || got[0].kind != evCharge || got[1].kind != evExpiring || got[2].kind != evPayment {
+		t.Fatalf("today with 0 days: plan = %+v, want charge, expiring and payment", got)
+	}
+}
+
+func TestPlanChargeCap(t *testing.T) {
+	sub := domain.Subscription{ID: 1, Status: domain.SubActive, BillingPeriod: domain.BillingMonth,
+		NextPaymentDate: dayPtr("1990-01-01")}
+	got := plan(sub, day("2026-10-23"), domain.NotificationSettings{})
+	if len(got) != 1 || len(got[0].charge) != maxChargesPerRun || !got[0].next.Equal(day("1992-01-01")) {
+		t.Fatalf("plan = %+v, want %d charges and next 1992-01-01", got, maxChargesPerRun)
+	}
+}
+
+func TestNextPayment(t *testing.T) {
+	cases := []struct {
+		from   string
+		period domain.BillingPeriod
+		want   string
+	}{
+		{"2026-10-23", domain.BillingMonth, "2026-11-23"},
+		{"2026-12-15", domain.BillingMonth, "2027-01-15"},
+		{"2026-01-31", domain.BillingMonth, "2026-02-28"},
+		{"2028-01-31", domain.BillingMonth, "2028-02-29"},
+		{"2026-11-30", domain.BillingQuarter, "2027-02-28"},
+		{"2026-10-23", domain.BillingQuarter, "2027-01-23"},
+		{"2028-02-29", domain.BillingYear, "2029-02-28"},
+	}
+	for _, c := range cases {
+		if got := nextPayment(day(c.from), c.period).Format(time.DateOnly); got != c.want {
+			t.Errorf("nextPayment(%s, %s) = %s, want %s", c.from, c.period, got, c.want)
+		}
 	}
 }
 

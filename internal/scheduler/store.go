@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -26,33 +27,35 @@ func NewStore(pool *pgxpool.Pool) *Store {
 
 // selectSub reads the fields plan needs, in the order scanSub expects.
 const selectSub = `
-	SELECT id, name, cost::text, currency, end_date, next_payment_date, status
+	SELECT id, name, cost::text, currency, billing_period, end_date, next_payment_date, status
 	FROM subtrack.subscriptions`
 
 func scanSub(row pgx.Row) (domain.Subscription, error) {
 	var s domain.Subscription
-	var status string
-	err := row.Scan(&s.ID, &s.Name, &s.Cost, &s.Currency, &s.EndDate, &s.NextPaymentDate, &status)
+	var period, status string
+	err := row.Scan(&s.ID, &s.Name, &s.Cost, &s.Currency, &period, &s.EndDate, &s.NextPaymentDate, &status)
+	s.BillingPeriod = domain.BillingPeriod(period)
 	s.Status = domain.SubscriptionStatus(status)
 	return s, err
 }
 
 // Candidates returns the ids of live subscriptions that may need something
 // done today: any not cancelled or expired whose end date has come within
-// expiringUntil or passed, whose next payment falls between today and
-// paymentUntil, or which is expiring_soon (its end date may have moved
-// away). plan decides what exactly; the list is only a cheap first cut.
+// expiringUntil or passed, whose next payment is due by paymentUntil
+// (passed ones included: they are charged), or which is expiring_soon (its
+// end date may have moved away). plan decides what exactly; the list is only
+// a cheap first cut.
 //
 // Errors:
 //   - any db error wrapped as "postgres: scheduler candidates ...".
-func (s *Store) Candidates(ctx context.Context, today, expiringUntil, paymentUntil time.Time) ([]int64, error) {
+func (s *Store) Candidates(ctx context.Context, expiringUntil, paymentUntil time.Time) ([]int64, error) {
 	rows, err := pg.Conn(ctx, s.pool).Query(ctx, `
 		SELECT id FROM subtrack.subscriptions
 		WHERE deleted_at IS NULL AND status IN ('active', 'expiring_soon')
 		  AND (status = 'expiring_soon'
-		       OR end_date <= $2::date
-		       OR next_payment_date BETWEEN $1::date AND $3::date)
-		ORDER BY id`, today, expiringUntil, paymentUntil)
+		       OR end_date <= $1::date
+		       OR next_payment_date <= $2::date)
+		ORDER BY id`, expiringUntil, paymentUntil)
 	if err != nil {
 		return nil, pg.Translate(ctx, "scheduler candidates", err)
 	}
@@ -87,6 +90,40 @@ func (s *Store) SetStatus(ctx context.Context, id int64, status domain.Subscript
 	_, err := pg.Conn(ctx, s.pool).Exec(ctx, `
 		UPDATE subtrack.subscriptions SET status = $2, updated_at = NOW() WHERE id = $1`, id, string(status))
 	return pg.Translate(ctx, "scheduler set status", err)
+}
+
+// CreatePending stores a pending payment of sub on day, for the
+// subscription's current cost and currency. It reports false when the
+// subscription already has a payment that day (the admin may have entered
+// it by hand): nothing is stored then.
+//
+// Errors:
+//   - any db error wrapped as "postgres: scheduler create pending: ...".
+func (s *Store) CreatePending(ctx context.Context, sub domain.Subscription, day time.Time) (int64, bool, error) {
+	var id int64
+	err := pg.Conn(ctx, s.pool).QueryRow(ctx, `
+		INSERT INTO subtrack.transactions (subscription_id, amount, currency, payment_date)
+		VALUES ($1, CAST($2::text AS NUMERIC), $3, $4)
+		ON CONFLICT (subscription_id, payment_date) DO NOTHING
+		RETURNING id`, sub.ID, sub.Cost, sub.Currency, day).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, pg.Translate(ctx, "scheduler create pending", err)
+	}
+	return id, true, nil
+}
+
+// SetNextPaymentDate stores the next payment date of a subscription the
+// caller has locked.
+//
+// Errors:
+//   - any db error wrapped as "postgres: scheduler set next payment: ...".
+func (s *Store) SetNextPaymentDate(ctx context.Context, id int64, day time.Time) error {
+	_, err := pg.Conn(ctx, s.pool).Exec(ctx, `
+		UPDATE subtrack.subscriptions SET next_payment_date = $2, updated_at = NOW() WHERE id = $1`, id, day)
+	return pg.Translate(ctx, "scheduler set next payment", err)
 }
 
 // MarkSent records that the event with this key is being notified. It

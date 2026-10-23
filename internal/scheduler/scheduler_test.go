@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +22,9 @@ type fakeRepo struct {
 	subs    map[int64]domain.Subscription
 	holders map[int64][]int64
 	log     map[string]bool
+	// payments holds "<sub id>/<date>" of every payment, pending or not.
+	payments map[string]bool
+	nextTxID int64
 	// failLock makes Lock fail for that subscription id.
 	failLock int64
 	// gone are ids Candidates still lists but Lock no longer finds.
@@ -28,14 +32,15 @@ type fakeRepo struct {
 }
 
 func newFakeRepo(subs ...domain.Subscription) *fakeRepo {
-	f := &fakeRepo{subs: map[int64]domain.Subscription{}, holders: map[int64][]int64{}, log: map[string]bool{}}
+	f := &fakeRepo{subs: map[int64]domain.Subscription{}, holders: map[int64][]int64{}, log: map[string]bool{},
+		payments: map[string]bool{}}
 	for _, s := range subs {
 		f.subs[s.ID] = s
 	}
 	return f
 }
 
-func (f *fakeRepo) Candidates(context.Context, time.Time, time.Time, time.Time) ([]int64, error) {
+func (f *fakeRepo) Candidates(context.Context, time.Time, time.Time) ([]int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	ids := make([]int64, 0, len(f.subs))
@@ -65,6 +70,27 @@ func (f *fakeRepo) SetStatus(_ context.Context, id int64, status domain.Subscrip
 	defer f.mu.Unlock()
 	s := f.subs[id]
 	s.Status = status
+	f.subs[id] = s
+	return nil
+}
+
+func (f *fakeRepo) CreatePending(_ context.Context, sub domain.Subscription, day time.Time) (int64, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	k := strconv.FormatInt(sub.ID, 10) + "/" + day.Format(time.DateOnly)
+	if f.payments[k] {
+		return 0, false, nil
+	}
+	f.payments[k] = true
+	f.nextTxID++
+	return f.nextTxID, true, nil
+}
+
+func (f *fakeRepo) SetNextPaymentDate(_ context.Context, id int64, day time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s := f.subs[id]
+	s.NextPaymentDate = &day
 	f.subs[id] = s
 	return nil
 }
@@ -348,5 +374,42 @@ func TestLoadConfig(t *testing.T) {
 		if _, err := LoadConfig(); err == nil {
 			t.Errorf("LoadConfig(%q, %q): want an error", bad[0], bad[1])
 		}
+	}
+}
+
+func TestRunOnceCharges(t *testing.T) {
+	f := newFixture(t,
+		domain.Subscription{ID: 1, Name: "Jira", Status: domain.SubActive, BillingPeriod: domain.BillingMonth,
+			NextPaymentDate: dayPtr("2026-09-23"), Cost: "100.00", Currency: "RUB"},
+	)
+	// The admin entered September by hand.
+	f.repo.payments["1/2026-09-23"] = true
+
+	rep, err := f.sched.RunOnce(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// September is skipped (already there), October is created and reminded
+	// (it is today), and the next date moves to November.
+	if rep != (Report{Checked: 1, Charged: 1, Notified: 1}) {
+		t.Errorf("report = %+v", rep)
+	}
+	if got := f.repo.subs[1].NextPaymentDate.Format(time.DateOnly); got != "2026-11-23" {
+		t.Errorf("next_payment_date = %s, want 2026-11-23", got)
+	}
+	if got := f.audit.Actions(); !slices.Equal(got, []string{"transaction.create", "subscription.update"}) {
+		t.Errorf("audit = %v", got)
+	}
+	last := f.audit.Last()
+	if last.ActorID != nil || last.Details["next_payment_date"] != "2026-11-23" || last.Details["by"] != "scheduler" {
+		t.Errorf("last audit entry = %+v", last)
+	}
+	if body := f.notify.sent[0].Body; !strings.Contains(body, "23.10.2026 (сегодня)") {
+		t.Errorf("payment body = %q", body)
+	}
+
+	rep, _ = f.sched.RunOnce(context.Background())
+	if rep != (Report{Checked: 1}) {
+		t.Errorf("second run: report = %+v, want nothing (next payment is a month away)", rep)
 	}
 }
