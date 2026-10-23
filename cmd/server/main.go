@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
 	// The zone database is embedded so SCHEDULER_TZ works on hosts without
 	// tzdata (minimal containers, some flatpaks).
 	_ "time/tzdata"
@@ -41,6 +42,16 @@ import (
 // Version is stamped at build time via -ldflags "-X 'main.Version=...'".
 var Version = "dev"
 
+// @title						SubTrack API
+// @version					1.0
+// @description				Учёт корпоративных подписок на ПО: реестр подписок и лицензий, заявки с согласованием (сотрудник → начальник отдела → админ), платежи, уведомления, аудит, аналитика и рекомендации по экономии.
+// @description				Ответ без ошибки — JSON с полем `data`, ошибка — JSON с полем `description`; суть результата передаёт HTTP-статус.
+// @description				Вход: `POST /auth/login`, затем кнопка Authorize и значение `Bearer <token>`.
+// @BasePath					/api/v1
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
+// @description				JWT из POST /auth/login в виде «Bearer <token>».
 func main() {
 	if err := run(); err != nil {
 		slog.Error("fatal", "err", err)
@@ -97,6 +108,7 @@ func run() error {
 		httpx.WriteOK(r.Context(), w, map[string]string{"status": "ok", "version": Version})
 	}).Methods("GET")
 
+	mountSwagger(r)
 	if err := server.Mount(ctx, r, pool, cfg.Auth, cfg.Scheduler.Location); err != nil {
 		return err
 	}

@@ -90,17 +90,17 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 
 // markRead godoc
 //
-//	@Summary		Mark a notification read
-//	@Tags			notifications
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			id	path		int	true	"Notification id"
-//	@Success		200	{object}	NotificationDTO
-//	@Failure		400	{object}	httpx.ErrorBody
-//	@Failure		401	{object}	httpx.ErrorBody
-//	@Failure		404	{object}	httpx.ErrorBody
-//	@Failure		500	{object}	httpx.ErrorBody
-//	@Router			/notifications/{id}/read [post]
+//	@Summary	Mark a notification read
+//	@Tags		notifications
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		id	path		int	true	"Notification id"
+//	@Success	200	{object}	NotificationDTO
+//	@Failure	400	{object}	httpx.ErrorBody
+//	@Failure	401	{object}	httpx.ErrorBody
+//	@Failure	404	{object}	httpx.ErrorBody
+//	@Failure	500	{object}	httpx.ErrorBody
+//	@Router		/notifications/{id}/read [post]
 func (h *handler) markRead(w http.ResponseWriter, r *http.Request) {
 	id, err := httpx.PathID(r)
 	if err != nil {
@@ -118,14 +118,14 @@ func (h *handler) markRead(w http.ResponseWriter, r *http.Request) {
 
 // markAllRead godoc
 //
-//	@Summary		Mark all my notifications read
-//	@Tags			notifications
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Success		200	{object}	MarkAllReadResponse
-//	@Failure		401	{object}	httpx.ErrorBody
-//	@Failure		500	{object}	httpx.ErrorBody
-//	@Router			/notifications/read-all [post]
+//	@Summary	Mark all my notifications read
+//	@Tags		notifications
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Success	200	{object}	MarkAllReadResponse
+//	@Failure	401	{object}	httpx.ErrorBody
+//	@Failure	500	{object}	httpx.ErrorBody
+//	@Router		/notifications/read-all [post]
 func (h *handler) markAllRead(w http.ResponseWriter, r *http.Request) {
 	actor, _ := auth.UserFromContext(r.Context())
 	n, err := h.svc.MarkAllRead(r.Context(), actor)

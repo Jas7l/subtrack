@@ -119,18 +119,18 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 
 // get godoc
 //
-//	@Summary		Get a payment (admin)
-//	@Tags			transactions
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			id	path		int	true	"Transaction id"
-//	@Success		200	{object}	TransactionDTO
-//	@Failure		400	{object}	httpx.ErrorBody
-//	@Failure		401	{object}	httpx.ErrorBody
-//	@Failure		403	{object}	httpx.ErrorBody
-//	@Failure		404	{object}	httpx.ErrorBody
-//	@Failure		500	{object}	httpx.ErrorBody
-//	@Router			/transactions/{id} [get]
+//	@Summary	Get a payment (admin)
+//	@Tags		transactions
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		id	path		int	true	"Transaction id"
+//	@Success	200	{object}	TransactionDTO
+//	@Failure	400	{object}	httpx.ErrorBody
+//	@Failure	401	{object}	httpx.ErrorBody
+//	@Failure	403	{object}	httpx.ErrorBody
+//	@Failure	404	{object}	httpx.ErrorBody
+//	@Failure	500	{object}	httpx.ErrorBody
+//	@Router		/transactions/{id} [get]
 func (h *handler) get(w http.ResponseWriter, r *http.Request) {
 	id, err := httpx.PathID(r)
 	if err != nil {

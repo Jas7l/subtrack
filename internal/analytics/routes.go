@@ -29,6 +29,7 @@ func RegisterRoutes(protected *mux.Router, svc *Service) {
 		"/analytics/top-subscriptions": admin(h.topSubscriptions),
 		"/analytics/spending":          admin(h.spending),
 		"/analytics/recommendations":   admin(h.recommendations),
+		"/analytics/export":            admin(h.export),
 	} {
 		httpx.Register(protected, path, map[string]http.HandlerFunc{"GET": fn})
 	}

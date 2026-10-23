@@ -5,10 +5,12 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/xuri/excelize/v2"
 
 	"subtrack/internal/apperr"
 	"subtrack/internal/auth"
@@ -184,6 +186,9 @@ func TestHTTPAnalytics(t *testing.T) {
 		{"admin", "GET", "/analytics/forecast?months=abc", 400},
 		{"admin", "GET", "/analytics/recommendations", 200},
 		{"admin", "POST", "/analytics/summary", 405},
+		{"head", "GET", "/analytics/export", 403},
+		{"admin", "GET", "/analytics/export?department_id=x", 400},
+		{"admin", "GET", "/analytics/export", 200},
 	}
 	for _, tt := range tests {
 		req := httptest.NewRequest(tt.method, "/api/v1"+tt.path, nil)
@@ -192,6 +197,43 @@ func TestHTTPAnalytics(t *testing.T) {
 		r.ServeHTTP(rec, req)
 		if rec.Code != tt.want {
 			t.Errorf("%s %s %s: status %d, want %d (body %s)", tt.as, tt.method, tt.path, rec.Code, tt.want, rec.Body)
+		}
+	}
+}
+
+func TestExportWorkbook(t *testing.T) {
+	svc, _ := newService()
+	h := &handler{svc: svc}
+	for _, c := range []struct {
+		query  string
+		sheets []string
+	}{
+		{"", []string{"Сводка", "Категории", "Вендоры", "Отделы", "Самые дорогие", "Оплачено по месяцам", "Прогноз", "Рекомендации"}},
+		{"?department_id=1", []string{"Сводка", "Категории", "Вендоры", "Самые дорогие", "Оплачено по месяцам", "Прогноз", "Рекомендации"}},
+	} {
+		req := httptest.NewRequest("GET", "/api/v1/analytics/export"+c.query, nil)
+		req = req.WithContext(auth.WithUser(req.Context(), admin))
+		rec := httptest.NewRecorder()
+		h.export(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("export%s: %d %s", c.query, rec.Code, rec.Body)
+		}
+		if cd := rec.Header().Get("Content-Disposition"); cd != `attachment; filename="subtrack-analytics-2026-11-01.xlsx"` {
+			t.Errorf("Content-Disposition = %q", cd)
+		}
+		f, err := excelize.OpenReader(rec.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := f.GetSheetList(); !slices.Equal(got, c.sheets) {
+			t.Errorf("export%s sheets = %v, want %v", c.query, got, c.sheets)
+		}
+		if v, _ := f.GetCellValue("Сводка", "A2"); v != "Активных подписок" {
+			t.Errorf("summary A2 = %q", v)
+		}
+		rows, _ := f.GetRows("Рекомендации")
+		if len(rows) < 2 || rows[len(rows)-1][0] != "Итого" {
+			t.Errorf("recommendations sheet = %v", rows)
 		}
 	}
 }

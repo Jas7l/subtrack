@@ -45,6 +45,13 @@ import (
 // loc is the company's time zone (SCHEDULER_TZ): it decides what "today" and
 // "this month" are in the reports, as it does for the scheduler.
 func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.Config, loc *time.Location) error {
+	authSvc := routes(r, pool, authCfg, loc)
+	return authSvc.EnsureAdmin(ctx, authCfg.Bootstrap)
+}
+
+// routes builds the domains and registers their routes; it does not touch
+// the database, so a test can build the router over a nil pool.
+func routes(r *mux.Router, pool *pgxpool.Pool, authCfg auth.Config, loc *time.Location) *auth.Service {
 	r.NotFoundHandler = http.HandlerFunc(httpx.RouteNotFound)
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.NotFoundHandler = r.NotFoundHandler
@@ -57,9 +64,6 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	users := user.NewStore(pool)
 	depts := department.NewStore(pool)
 	authSvc := auth.New(users, authCfg, tx, trail)
-	if err := authSvc.EnsureAdmin(ctx, authCfg.Bootstrap); err != nil {
-		return err
-	}
 
 	// The protected subrouter matches every path under /api/v1 but has no
 	// NotFoundHandler of its own, so a path none of its routes match falls
@@ -80,7 +84,7 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	settings.RegisterRoutes(protected, settings.New(settings.NewStore(pool), tx, trail))
 	transaction.RegisterRoutes(protected, transaction.New(transaction.NewStore(pool), subStore, tx, trail))
 	analytics.RegisterRoutes(protected, analytics.New(analytics.NewStore(pool), loc))
-	return nil
+	return authSvc
 }
 
 // NewScheduler builds the background date checker over the same pool. The

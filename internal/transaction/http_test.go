@@ -37,6 +37,9 @@ func TestHTTPTransactions(t *testing.T) {
 		want                         int
 	}{
 		{"list as manager", "manager", "GET", "/transactions", "", 403},
+		{"export as manager", "manager", "GET", "/transactions/export", "", 403},
+		{"export bad status", "admin", "GET", "/transactions/export?status=x", "", 400},
+		{"export", "admin", "GET", "/transactions/export?order=asc", "", 200},
 		{"pay as manager", "manager", "POST", "/transactions/1/pay", "", 403},
 		{"list", "admin", "GET", "/transactions?status=pending&order=asc", "", 200},
 		{"list bad status", "admin", "GET", "/transactions?status=new", "", 400},

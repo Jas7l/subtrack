@@ -1,0 +1,4939 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Учёт корпоративных подписок на ПО: реестр подписок и лицензий, заявки с согласованием (сотрудник → начальник отдела → админ), платежи, уведомления, аудит, аналитика и рекомендации по экономии.\nОтвет без ошибки — JSON с полем `data`, ошибка — JSON с полем `description`; суть результата передаёт HTTP-статус.\nВход: `POST /auth/login`, затем кнопка Authorize и значение `Bearer \u003ctoken\u003e`.",
+        "title": "SubTrack API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/api/v1",
+    "paths": {
+        "/analytics/by-category": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Active subscriptions grouped by category (case-insensitively), most expensive first, with their share. A head gets their own department.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Monthly cost by category (admin, department head)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Admin: one department",
+                        "name": "department_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/analytics.BreakdownResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/by-department": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every department with its active subscriptions' monthly cost, seats, active users and cost per user, most expensive first; department_id null holds the company-wide subscriptions.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Departments compared (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/analytics.ByDepartmentResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/by-vendor": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Active subscriptions grouped by vendor (case-insensitively), most expensive first, with their share. A head gets their own department.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Monthly cost by vendor (admin, department head)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Admin: one department",
+                        "name": "department_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/analytics.BreakdownResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/export": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "One workbook: summary, cost by category, by vendor and (for the whole company) by department, the 20 most expensive subscriptions, paid by month for the last 12 months, a 12-month forecast and the recommendations.",
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Export the analytics to Excel (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "One department",
+                        "name": "department_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/forecast": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Expected spending of the active subscriptions, month by month from this one: payments by next_payment_date and billing period up to the end date, plus the monthly cost of subscriptions without a next_payment_date (estimated). run_rate_rub is the cost if everything were renewed. A head gets their own department.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Budget forecast (admin, department head)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Admin: one department",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "How many months (default 12, max 36)",
+                        "name": "months",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/analytics.ForecastResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/recommendations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Advice from the rules: unused seats, nobody using a subscription, several subscriptions of one vendor, individual copies of one product, an unlimited licence used by few, monthly billing for over a year, an expired subscription with licences still out. Sorted by yearly saving; advice whose saving cannot be computed comes last with savings_rub_year null.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Savings recommendations (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "One department",
+                        "name": "department_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/analytics.RecommendationsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/spending": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Paid payments summed by the month of their payment date, in roubles at the current rates; every month of the period is present. Default: the last 12 months; at most 60.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Paid by month (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "One department",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "First month, YYYY-MM",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Last month, YYYY-MM (default: this month)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/analytics.SpendingResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Counts, monthly and annual cost in roubles, seat usage, licences and cost per user. The admin may pick a department and also gets payment figures and the recommendations' count and savings; a head always gets their own department and no payment figures.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Dashboard summary (admin, department head)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Admin: one department",
+                        "name": "department_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/analytics.SummaryDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/analytics/top-subscriptions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Active subscriptions by monthly cost, with seat usage and the monthly cost per licence handed out.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Most expensive subscriptions (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "One department",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "How many (default 10, max 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/analytics.TopResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/assignments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin: all. Manager: those of their department's subscriptions plus their own. Employee: their own. Newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assignments"
+                ],
+                "summary": "List licences",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only this subscription's",
+                        "name": "subscription_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this user's",
+                        "name": "user_id",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "revoked"
+                        ],
+                        "type": "string",
+                        "description": "Only this status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ListAssignmentsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin: any active or expiring_soon subscription to any active user. Manager: only their department's subscriptions, only to people of their department. Takes one seat.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assignments"
+                ],
+                "summary": "Hand out a licence (admin, manager)",
+                "parameters": [
+                    {
+                        "description": "Who gets which subscription",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/subscription.AssignRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.AssignmentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/assignments/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Visible as in the list; anything else is a 404.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assignments"
+                ],
+                "summary": "Get a licence",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Assignment id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.AssignmentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/assignments/{id}/revoke": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Frees the seat; the row stays as history. Allowed to the admin, the manager of the subscription's department, and the holder (giving it back).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assignments"
+                ],
+                "summary": "Revoke a licence",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Assignment id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.AssignmentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/audit": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Who changed what, newest first. actor_id null means the system. Actions are \"\u003centity\u003e.\u003cverb\u003e\", e.g. user.update, subscription.delete, assignment.revoke, request.approve.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "audit"
+                ],
+                "summary": "Audit trail (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only this user's actions",
+                        "name": "actor_id",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "user",
+                            "department",
+                            "subscription",
+                            "assignment",
+                            "request"
+                        ],
+                        "type": "string",
+                        "description": "Only this entity type",
+                        "name": "entity_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this entity (with entity_type)",
+                        "name": "entity_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only this action",
+                        "name": "action",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "From this day (YYYY-MM-DD), inclusive",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "To this day (YYYY-MM-DD), inclusive",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/audit.ListAuditResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "Checks email and password and returns a JWT. An unknown email and a wrong password both answer 401 with the same message; a blocked account answers 403.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Sign in",
+                "parameters": [
+                    {
+                        "description": "Credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the user the bearer token belongs to.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Current user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.MeDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/password": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Replaces the caller's password after checking the current one. Issued tokens stay valid.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Change own password",
+                "parameters": [
+                    {
+                        "description": "Current and new password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.ChangePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/departments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin: all departments, sorted by name. Anyone else: only their own department (zero or one item).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "departments"
+                ],
+                "summary": "List departments",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Substring of the name (admin only)",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/department.ListDepartmentsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The name is unique case-insensitively. The head, if given, must be an active manager who heads no other department; they are moved into the new department.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "departments"
+                ],
+                "summary": "Create a department (admin)",
+                "parameters": [
+                    {
+                        "description": "Department fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/department.CreateDepartmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/department.DepartmentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/departments/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin: any department. Anyone else: only their own; another department is a 404.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "departments"
+                ],
+                "summary": "Get a department",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Department id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/department.DepartmentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Only an empty department can be deleted: no active users and no subscriptions (409 otherwise, with the counts). Blocked users and past requests that point at it are detached.",
+                "tags": [
+                    "departments"
+                ],
+                "summary": "Delete a department (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Department id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Rename and/or change the head; at least one field. A new head must be an active manager who heads no other department and is moved into this one; the previous head stays in the department. `\"head_id\": null` leaves it without a head.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "departments"
+                ],
+                "summary": "Update a department (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Department id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/department.UpdateDepartmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/department.DepartmentDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The caller's own notifications, newest first, with the unread count.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "My notifications",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "true: only unread",
+                        "name": "unread",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/notification.ListNotificationsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/read-all": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark all my notifications read",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/notification.MarkAllReadResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/notifications/{id}/read": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark a notification read",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Notification id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/notification.NotificationDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin: all. Manager: their department's plus their own (incoming ones: ?status=pending_manager). Employee: their own. Newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "List requests",
+                "parameters": [
+                    {
+                        "enum": [
+                            "pending_manager",
+                            "rejected_by_manager",
+                            "pending_admin",
+                            "rejected_by_admin",
+                            "approved",
+                            "cancelled"
+                        ],
+                        "type": "string",
+                        "description": "Only this status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this requester's",
+                        "name": "requester_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this department's",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/request.ListRequestsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "An employee's request goes to the head of their department, or straight to the admin when there is no head; a manager's goes to the admin. name and justification are required; currency defaults to RUB.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "Request a subscription (employee, manager)",
+                "parameters": [
+                    {
+                        "description": "What is needed and why",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.CreateRequestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/request.RequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/requests/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Visible as in the list; anything else is a 404.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "Get a request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/request.RequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/requests/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The department head moves a pending_manager request to pending_admin. The admin approves a pending_admin request (or a pending_manager one when the department has no head) and picks the subscription: an existing one (subscription_id) or a new one (subscription), and the requester gets a licence of it - all in one transaction. If the licence cannot be handed out (no free seats, cancelled subscription, the requester already holds it) the answer is 409 and the request stays pending.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "Approve a request (department head, admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Comment and, for the admin, the subscription",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ApproveRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/request.RequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/requests/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Only the requester, only while the request is pending.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "Cancel own request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/request.RequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/requests/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The department head rejects at pending_manager, the admin at pending_admin (or at pending_manager when the department has no head). A comment is required.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "Reject a request (department head, admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Why",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.RejectRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/request.RequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/notifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "How many days before the end date a subscription becomes expiring_soon (its holders and the admins are warned), and how many days before the next payment the admins are reminded.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Notification settings (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/settings.NotificationSettingsDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Both values are required, each 0..365 days (0 = only on the day itself). The scheduler uses the new values from its next run.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Change the notification settings (admin)",
+                "parameters": [
+                    {
+                        "description": "New values",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/settings.PutNotificationSettingsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/settings.NotificationSettingsDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/subscriptions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin: all. Manager: their department's plus the ones they hold a licence of. Employee: the ones they hold a licence of. Deleted subscriptions are never listed. Sorted by name.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "List subscriptions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only this department's",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Whole category, case-insensitive",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "active",
+                            "expiring_soon",
+                            "expired",
+                            "cancelled"
+                        ],
+                        "type": "string",
+                        "description": "Only this status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "individual",
+                            "group",
+                            "enterprise"
+                        ],
+                        "type": "string",
+                        "description": "Only this type",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_date on or after (YYYY-MM-DD)",
+                        "name": "end_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_date on or before (YYYY-MM-DD)",
+                        "name": "end_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Substring of the name or vendor",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ListSubscriptionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Starts active with no licences handed out. individual always has 1 seat; group needs seats_total; enterprise is unlimited (no seats_total). The currency must exist in the currencies table.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Create a subscription (admin)",
+                "parameters": [
+                    {
+                        "description": "Subscription fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/subscription.CreateSubscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.SubscriptionDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/subscriptions/export": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every subscription matching the same filters as the list, as an .xlsx sheet.",
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Export subscriptions to Excel (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only this department",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Category, case-insensitive",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "active | expiring_soon | expired | cancelled",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "individual | group | enterprise",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_date from, inclusive (YYYY-MM-DD)",
+                        "name": "end_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "end_date to, inclusive (YYYY-MM-DD)",
+                        "name": "end_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Substring of name or vendor",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/subscriptions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Visible as in the list; anything else is a 404.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Get a subscription",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subscription id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.SubscriptionDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Soft delete: the row stays for payment history, but is no longer listed. Every licence is revoked.",
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Delete a subscription (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subscription id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partial update; at least one field. status may be set to active or cancelled only (expiring_soon and expired are set by the scheduler); cancelling revokes every licence. seats_total cannot go below seats_used (409). Changing type without seats_total resets the seats: 1 for individual, unlimited for enterprise, group then needs seats_total.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "summary": "Update a subscription (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subscription id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/subscription.UpdateSubscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.SubscriptionDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "By payment date, newest first (`order=asc`: oldest first). Expected payments: `status=pending\u0026order=asc`.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "List payments (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only this subscription",
+                        "name": "subscription_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "pending | paid | failed",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "payment_date from, inclusive (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "payment_date to, inclusive (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "desc (default) | asc",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.ListTransactionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "A one-off payment or a past one; it is stored as paid. Cancelled and expired subscriptions are accepted too. 409 when the subscription already has a payment on that date.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Enter a payment by hand (admin)",
+                "parameters": [
+                    {
+                        "description": "The payment",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/transaction.CreateTransactionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.TransactionDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions/export": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every payment matching the same filters as the list, as an .xlsx sheet, by payment date (newest first; `order=asc`: oldest first).",
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Export payments to Excel (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only this subscription",
+                        "name": "subscription_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "pending | paid | failed",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "payment_date from, inclusive (YYYY-MM-DD)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "payment_date to, inclusive (YYYY-MM-DD)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "desc (default) | asc",
+                        "name": "order",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Get a payment (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Transaction id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.TransactionDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions/{id}/fail": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Only from pending. A failed payment can still be paid later.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Mark a payment failed (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Transaction id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.TransactionDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions/{id}/pay": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "From pending or failed. The body is optional; a given payment_method or invoice_number is stored.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Mark a payment paid (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Transaction id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Payment details",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.PayTransactionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.TransactionDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin: all users. Manager: only their department (the department_id filter is ignored). Employee: 403. Sorted by full name.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List users",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only users of this department",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "admin",
+                            "manager",
+                            "employee"
+                        ],
+                        "type": "string",
+                        "description": "Only this role",
+                        "name": "role",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "true: only active, false: only blocked",
+                        "name": "active",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Substring of full name or email",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.ListUsersResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The admin sets the initial password and hands it to the person. The email is unique case-insensitively (409 on a clash).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Create a user (admin)",
+                "parameters": [
+                    {
+                        "description": "User fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/user.UserDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin: any user. Manager: users of their department. Employee: only themselves. A user outside the caller's view is a 404.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.UserDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Partial update; at least one field. `\"is_active\": false` blocks the user (their tokens stop working at once), `true` unblocks. `\"department_id\": null` removes them from their department. If the user headed a department and is blocked, demoted or moved out of it, that department is left without a head. Blocking also revokes all their licences. An admin cannot block themselves or drop their own admin role (409).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Update a user (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.UpdateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.UserDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}/password": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets a new password, e.g. when the person forgot theirs. Issued tokens stay valid.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Reset a user's password (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.SetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "analytics.BreakdownResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/analytics.SliceDTO"
+                    }
+                }
+            }
+        },
+        "analytics.ByDepartmentResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/analytics.DepartmentRowDTO"
+                    }
+                }
+            }
+        },
+        "analytics.DepartmentRowDTO": {
+            "type": "object",
+            "properties": {
+                "active_users": {
+                    "type": "integer",
+                    "example": 40
+                },
+                "cost_per_user_rub": {
+                    "type": "string",
+                    "example": "2300.00"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "monthly_cost_rub": {
+                    "type": "string",
+                    "example": "92000.00"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "seats_total": {
+                    "type": "integer",
+                    "example": 60
+                },
+                "seats_used": {
+                    "type": "integer",
+                    "example": 48
+                },
+                "subscriptions": {
+                    "type": "integer",
+                    "example": 9
+                },
+                "utilization_pct": {
+                    "type": "number",
+                    "example": 80
+                }
+            }
+        },
+        "analytics.ForecastMonthDTO": {
+            "type": "object",
+            "properties": {
+                "estimated_rub": {
+                    "type": "string",
+                    "example": "5000.00"
+                },
+                "month": {
+                    "type": "string",
+                    "example": "2026-11"
+                },
+                "payments": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "scheduled_rub": {
+                    "type": "string",
+                    "example": "150000.00"
+                },
+                "total_rub": {
+                    "type": "string",
+                    "example": "155000.00"
+                }
+            }
+        },
+        "analytics.ForecastResponse": {
+            "type": "object",
+            "properties": {
+                "months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/analytics.ForecastMonthDTO"
+                    }
+                },
+                "run_rate_rub": {
+                    "type": "string",
+                    "example": "2220000.00"
+                },
+                "total_rub": {
+                    "description": "TotalRUB sums the months; RunRateRUB is what they would cost if every\nactive subscription were renewed (monthly cost × months).",
+                    "type": "string",
+                    "example": "1860000.00"
+                },
+                "unscheduled": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "analytics.PaymentStatsDTO": {
+            "type": "object",
+            "properties": {
+                "failed_count": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "overdue_count": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "paid_this_month_rub": {
+                    "type": "string",
+                    "example": "84500.00"
+                },
+                "paid_this_year_rub": {
+                    "type": "string",
+                    "example": "912000.00"
+                },
+                "pending_count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "pending_rub": {
+                    "type": "string",
+                    "example": "27000.00"
+                }
+            }
+        },
+        "analytics.RecommendationDTO": {
+            "type": "object",
+            "properties": {
+                "savings_rub_year": {
+                    "type": "string",
+                    "example": "120000.00"
+                },
+                "subscription_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "text": {
+                    "type": "string",
+                    "example": "Занято 30 из 50 мест Jira. Сократите 20 мест — сэкономите 120 000 ₽/год."
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Лишние места: Jira"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "unused_seats",
+                        "no_holders",
+                        "duplicate_vendor",
+                        "individual_to_group",
+                        "enterprise_low_usage",
+                        "annual_billing",
+                        "expired_with_holders"
+                    ],
+                    "example": "unused_seats"
+                }
+            }
+        },
+        "analytics.RecommendationsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/analytics.RecommendationDTO"
+                    }
+                },
+                "total_savings_rub_year": {
+                    "description": "TotalSavingsRUBYear sums the savings that could be computed.",
+                    "type": "string",
+                    "example": "240000.00"
+                }
+            }
+        },
+        "analytics.SliceDTO": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "monthly_cost_rub": {
+                    "type": "string",
+                    "example": "64000.00"
+                },
+                "share_pct": {
+                    "type": "number",
+                    "example": 34.6
+                },
+                "subscriptions": {
+                    "type": "integer",
+                    "example": 6
+                }
+            }
+        },
+        "analytics.SpendingMonthDTO": {
+            "type": "object",
+            "properties": {
+                "amount_rub": {
+                    "type": "string",
+                    "example": "84500.00"
+                },
+                "month": {
+                    "type": "string",
+                    "example": "2026-10"
+                },
+                "payments": {
+                    "type": "integer",
+                    "example": 7
+                }
+            }
+        },
+        "analytics.SpendingResponse": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string",
+                    "example": "2025-11"
+                },
+                "months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/analytics.SpendingMonthDTO"
+                    }
+                },
+                "to": {
+                    "type": "string",
+                    "example": "2026-10"
+                },
+                "total_rub": {
+                    "type": "string",
+                    "example": "912000.00"
+                }
+            }
+        },
+        "analytics.SummaryDTO": {
+            "type": "object",
+            "properties": {
+                "active_subscriptions": {
+                    "type": "integer",
+                    "example": 24
+                },
+                "active_users": {
+                    "type": "integer",
+                    "example": 95
+                },
+                "annual_cost_rub": {
+                    "type": "string",
+                    "example": "2220000.00"
+                },
+                "cost_per_user_rub": {
+                    "type": "string",
+                    "example": "1947.37"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "enterprise_subscriptions": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "expired": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "expiring_soon": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "licences": {
+                    "type": "integer",
+                    "example": 160
+                },
+                "monthly_cost_rub": {
+                    "type": "string",
+                    "example": "185000.00"
+                },
+                "payments": {
+                    "$ref": "#/definitions/analytics.PaymentStatsDTO"
+                },
+                "potential_savings_rub": {
+                    "type": "string",
+                    "example": "240000.00"
+                },
+                "recommendations": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "seats_free": {
+                    "type": "integer",
+                    "example": 28
+                },
+                "seats_total": {
+                    "type": "integer",
+                    "example": 140
+                },
+                "seats_used": {
+                    "type": "integer",
+                    "example": 112
+                },
+                "utilization_pct": {
+                    "type": "number",
+                    "example": 80
+                }
+            }
+        },
+        "analytics.TopResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/analytics.TopRowDTO"
+                    }
+                }
+            }
+        },
+        "analytics.TopRowDTO": {
+            "type": "object",
+            "properties": {
+                "annual_cost_rub": {
+                    "type": "string",
+                    "example": "360000.00"
+                },
+                "cost_per_licence_rub": {
+                    "type": "string",
+                    "example": "1000.00"
+                },
+                "department_name": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "monthly_cost_rub": {
+                    "type": "string",
+                    "example": "30000.00"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Jira"
+                },
+                "seats_total": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "seats_used": {
+                    "type": "integer",
+                    "example": 30
+                },
+                "status": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "subscription_id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "utilization_pct": {
+                    "type": "number",
+                    "example": 60
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "Atlassian"
+                }
+            }
+        },
+        "audit.EntryDTO": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "example": "assignment.revoke"
+                },
+                "actor_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "actor_name": {
+                    "type": "string",
+                    "example": "Иванов Иван Иванович"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-23T10:00:00Z"
+                },
+                "details": {
+                    "type": "object"
+                },
+                "entity_id": {
+                    "type": "integer",
+                    "example": 40
+                },
+                "entity_type": {
+                    "type": "string",
+                    "example": "assignment"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 301
+                }
+            }
+        },
+        "audit.ListAuditResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/audit.EntryDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
+        "auth.ChangePasswordRequest": {
+            "type": "object",
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "example": "change-me-now"
+                },
+                "new_password": {
+                    "type": "string",
+                    "example": "a-better-password"
+                }
+            }
+        },
+        "auth.LoginRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "admin@company.ru"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "change-me-now"
+                }
+            }
+        },
+        "auth.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string",
+                    "example": "2026-10-22T08:00:00Z"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                },
+                "user": {
+                    "$ref": "#/definitions/auth.MeDTO"
+                }
+            }
+        },
+        "auth.MeDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-21T10:00:00Z"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "email": {
+                    "type": "string",
+                    "example": "ivanov@company.ru"
+                },
+                "full_name": {
+                    "type": "string",
+                    "example": "Иванов Иван Иванович"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "admin",
+                        "manager",
+                        "employee"
+                    ],
+                    "example": "employee"
+                }
+            }
+        },
+        "department.CreateDepartmentRequest": {
+            "type": "object",
+            "properties": {
+                "head_id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Разработка"
+                }
+            }
+        },
+        "department.DepartmentDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-21T10:00:00Z"
+                },
+                "employee_count": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "head_id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "head_name": {
+                    "type": "string",
+                    "example": "Сидоров Сидор Сидорович"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-21T10:00:00Z"
+                }
+            }
+        },
+        "department.ListDepartmentsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/department.DepartmentDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
+        "department.UpdateDepartmentRequest": {
+            "type": "object",
+            "properties": {
+                "head_id": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 5
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Разработка"
+                }
+            }
+        },
+        "httpx.ErrorBody": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "example": "resource not found"
+                }
+            }
+        },
+        "notification.ListNotificationsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/notification.NotificationDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                },
+                "unread": {
+                    "description": "Unread counts all unread notifications, whatever the page.",
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "notification.MarkAllReadResponse": {
+            "type": "object",
+            "properties": {
+                "marked": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "notification.NotificationDTO": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "example": "Вам выдана лицензия Figma."
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-23T10:00:00Z"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 88
+                },
+                "is_read": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Заявка одобрена: Figma"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "subscription_expiring",
+                        "subscription_expired",
+                        "payment_due",
+                        "request_created",
+                        "request_approved",
+                        "request_rejected"
+                    ],
+                    "example": "request_approved"
+                }
+            }
+        },
+        "request.ApproveRequest": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "type": "string",
+                    "example": "Согласовано"
+                },
+                "subscription": {
+                    "$ref": "#/definitions/request.NewSubscriptionBody"
+                },
+                "subscription_id": {
+                    "type": "integer",
+                    "example": 12
+                }
+            }
+        },
+        "request.CreateRequestRequest": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string",
+                    "example": "RUB"
+                },
+                "estimated_cost": {
+                    "type": "string",
+                    "example": "1500.00"
+                },
+                "justification": {
+                    "type": "string",
+                    "example": "Нужна для макетов нового интерфейса"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Figma"
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "Figma Inc."
+                }
+            }
+        },
+        "request.ListRequestsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/request.RequestDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
+        "request.NewSubscriptionBody": {
+            "type": "object",
+            "properties": {
+                "billing_period": {
+                    "type": "string",
+                    "enum": [
+                        "month",
+                        "quarter",
+                        "year"
+                    ],
+                    "example": "month"
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Дизайн"
+                },
+                "cost": {
+                    "type": "string",
+                    "example": "15000.00"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "RUB"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 3
+                },
+                "end_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2027-10-31"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Figma"
+                },
+                "next_payment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-12-01"
+                },
+                "seats_total": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-11-01"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "individual",
+                        "group",
+                        "enterprise"
+                    ],
+                    "example": "group"
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "Figma Inc."
+                }
+            }
+        },
+        "request.RejectRequest": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "type": "string",
+                    "example": "У отдела уже есть Canva, используйте её"
+                }
+            }
+        },
+        "request.RequestDTO": {
+            "type": "object",
+            "properties": {
+                "admin_comment": {
+                    "type": "string",
+                    "example": ""
+                },
+                "admin_decided_at": {
+                    "type": "string",
+                    "example": "2026-10-24T09:00:00Z"
+                },
+                "admin_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-23T10:00:00Z"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "RUB"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "department_name": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "estimated_cost": {
+                    "type": "string",
+                    "example": "1500.00"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 15
+                },
+                "justification": {
+                    "type": "string",
+                    "example": "Нужна для макетов нового интерфейса"
+                },
+                "manager_comment": {
+                    "type": "string",
+                    "example": "Согласовано"
+                },
+                "manager_decided_at": {
+                    "type": "string",
+                    "example": "2026-10-23T12:00:00Z"
+                },
+                "manager_id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Figma"
+                },
+                "requester_id": {
+                    "type": "integer",
+                    "example": 7
+                },
+                "requester_name": {
+                    "type": "string",
+                    "example": "Петров Пётр Петрович"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending_manager",
+                        "rejected_by_manager",
+                        "pending_admin",
+                        "rejected_by_admin",
+                        "approved",
+                        "cancelled"
+                    ],
+                    "example": "pending_manager"
+                },
+                "subscription_id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-23T10:00:00Z"
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "Figma Inc."
+                }
+            }
+        },
+        "settings.NotificationSettingsDTO": {
+            "type": "object",
+            "properties": {
+                "expiring_days": {
+                    "type": "integer",
+                    "example": 7
+                },
+                "payment_days": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-23T10:00:00Z"
+                },
+                "updated_by": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "settings.PutNotificationSettingsRequest": {
+            "type": "object",
+            "properties": {
+                "expiring_days": {
+                    "type": "integer",
+                    "example": 7
+                },
+                "payment_days": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "subscription.AssignRequest": {
+            "type": "object",
+            "properties": {
+                "subscription_id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "user_id": {
+                    "type": "integer",
+                    "example": 7
+                }
+            }
+        },
+        "subscription.AssignmentDTO": {
+            "type": "object",
+            "properties": {
+                "assigned_at": {
+                    "type": "string",
+                    "example": "2026-10-23T10:00:00Z"
+                },
+                "assigned_by": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 40
+                },
+                "revoked_at": {
+                    "type": "string",
+                    "example": "2026-11-02T09:30:00Z"
+                },
+                "revoked_by": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "revoked"
+                    ],
+                    "example": "active"
+                },
+                "subscription_id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "subscription_name": {
+                    "type": "string",
+                    "example": "Jira"
+                },
+                "user_id": {
+                    "type": "integer",
+                    "example": 7
+                },
+                "user_name": {
+                    "type": "string",
+                    "example": "Петров Пётр Петрович"
+                }
+            }
+        },
+        "subscription.CreateSubscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "billing_period": {
+                    "type": "string",
+                    "enum": [
+                        "month",
+                        "quarter",
+                        "year"
+                    ],
+                    "example": "month"
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "cost": {
+                    "type": "string",
+                    "example": "15000.00"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "RUB"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "end_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-12-31"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Jira"
+                },
+                "next_payment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-11-01"
+                },
+                "seats_total": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-01-01"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "individual",
+                        "group",
+                        "enterprise"
+                    ],
+                    "example": "group"
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "Atlassian"
+                }
+            }
+        },
+        "subscription.ListAssignmentsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/subscription.AssignmentDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
+        "subscription.ListSubscriptionsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/subscription.SubscriptionDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
+        "subscription.SubscriptionDTO": {
+            "type": "object",
+            "properties": {
+                "billing_period": {
+                    "type": "string",
+                    "enum": [
+                        "month",
+                        "quarter",
+                        "year"
+                    ],
+                    "example": "month"
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "cost": {
+                    "type": "string",
+                    "example": "15000.00"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-21T10:00:00Z"
+                },
+                "created_by": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "RUB"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "department_name": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "end_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-12-31"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Jira"
+                },
+                "next_payment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-11-01"
+                },
+                "seats_free": {
+                    "type": "integer",
+                    "example": 6
+                },
+                "seats_total": {
+                    "description": "SeatsTotal and SeatsFree are null for enterprise (unlimited).",
+                    "type": "integer",
+                    "example": 20
+                },
+                "seats_used": {
+                    "type": "integer",
+                    "example": 14
+                },
+                "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-01-01"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "expiring_soon",
+                        "expired",
+                        "cancelled"
+                    ],
+                    "example": "active"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "individual",
+                        "group",
+                        "enterprise"
+                    ],
+                    "example": "group"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-21T10:00:00Z"
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "Atlassian"
+                }
+            }
+        },
+        "subscription.UpdateSubscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "billing_period": {
+                    "type": "string",
+                    "enum": [
+                        "month",
+                        "quarter",
+                        "year"
+                    ],
+                    "example": "month"
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "cost": {
+                    "type": "string",
+                    "example": "15000.00"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "RUB"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 3
+                },
+                "end_date": {
+                    "type": "string",
+                    "format": "date",
+                    "x-nullable": true,
+                    "example": "2026-12-31"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Jira"
+                },
+                "next_payment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "x-nullable": true,
+                    "example": "2026-11-01"
+                },
+                "seats_total": {
+                    "type": "integer",
+                    "example": 25
+                },
+                "start_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-01-01"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "cancelled"
+                    ],
+                    "example": "cancelled"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "individual",
+                        "group",
+                        "enterprise"
+                    ],
+                    "example": "group"
+                },
+                "vendor": {
+                    "type": "string",
+                    "example": "Atlassian"
+                }
+            }
+        },
+        "transaction.CreateTransactionRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string",
+                    "example": "15000.00"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "RUB"
+                },
+                "invoice_number": {
+                    "type": "string",
+                    "example": "INV-2026-090"
+                },
+                "payment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-09-01"
+                },
+                "payment_method": {
+                    "type": "string",
+                    "example": "Счёт"
+                },
+                "subscription_id": {
+                    "type": "integer",
+                    "example": 12
+                }
+            }
+        },
+        "transaction.ListTransactionsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transaction.TransactionDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
+        "transaction.PayTransactionRequest": {
+            "type": "object",
+            "properties": {
+                "invoice_number": {
+                    "type": "string",
+                    "example": "INV-2026-114"
+                },
+                "payment_method": {
+                    "type": "string",
+                    "example": "Корпоративная карта"
+                }
+            }
+        },
+        "transaction.TransactionDTO": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string",
+                    "example": "15000.00"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-11-01T00:05:00Z"
+                },
+                "currency": {
+                    "type": "string",
+                    "example": "RUB"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 40
+                },
+                "invoice_number": {
+                    "type": "string",
+                    "example": "INV-2026-114"
+                },
+                "paid_at": {
+                    "type": "string",
+                    "example": "2026-11-01T09:30:00Z"
+                },
+                "payment_date": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-11-01"
+                },
+                "payment_method": {
+                    "type": "string",
+                    "example": "Корпоративная карта"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "paid",
+                        "failed"
+                    ],
+                    "example": "pending"
+                },
+                "subscription_id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "subscription_name": {
+                    "type": "string",
+                    "example": "Jira"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-11-01T09:30:00Z"
+                }
+            }
+        },
+        "user.CreateUserRequest": {
+            "type": "object",
+            "properties": {
+                "department_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "email": {
+                    "type": "string",
+                    "example": "petrov@company.ru"
+                },
+                "full_name": {
+                    "type": "string",
+                    "example": "Петров Пётр Петрович"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "initial-password"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "admin",
+                        "manager",
+                        "employee"
+                    ],
+                    "example": "employee"
+                }
+            }
+        },
+        "user.ListUsersResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.UserDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
+        "user.SetPasswordRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "example": "temporary-password"
+                }
+            }
+        },
+        "user.UpdateUserRequest": {
+            "type": "object",
+            "properties": {
+                "department_id": {
+                    "type": "integer",
+                    "x-nullable": true,
+                    "example": 3
+                },
+                "email": {
+                    "type": "string",
+                    "example": "petrov@company.ru"
+                },
+                "full_name": {
+                    "type": "string",
+                    "example": "Петров Пётр Петрович"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "admin",
+                        "manager",
+                        "employee"
+                    ],
+                    "example": "manager"
+                }
+            }
+        },
+        "user.UserDTO": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-21T10:00:00Z"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "email": {
+                    "type": "string",
+                    "example": "petrov@company.ru"
+                },
+                "full_name": {
+                    "type": "string",
+                    "example": "Петров Пётр Петрович"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 7
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "admin",
+                        "manager",
+                        "employee"
+                    ],
+                    "example": "employee"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-21T10:00:00Z"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "JWT из POST /auth/login в виде «Bearer \u003ctoken\u003e».",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

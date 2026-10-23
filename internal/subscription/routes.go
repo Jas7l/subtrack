@@ -25,6 +25,9 @@ func RegisterRoutes(protected *mux.Router, svc *Service) {
 		"GET":  h.list,
 		"POST": admin(h.create),
 	})
+	httpx.Register(protected, "/subscriptions/export", map[string]http.HandlerFunc{
+		"GET": admin(h.export),
+	})
 	httpx.Register(protected, "/subscriptions/{id:[0-9]+}", map[string]http.HandlerFunc{
 		"GET":    h.get,
 		"PATCH":  admin(h.update),

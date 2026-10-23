@@ -73,6 +73,9 @@ func TestHTTPSubscriptions(t *testing.T) {
 		want         int
 	}{
 		{"create as manager", mgr, "POST", "/subscriptions", `{}`, 403},
+		{"export as manager", mgr, "GET", "/subscriptions/export", "", 403},
+		{"export bad status", admin, "GET", "/subscriptions/export?status=x", "", 400},
+		{"export", admin, "GET", "/subscriptions/export?status=active", "", 200},
 		{"create bad date", admin, "POST", "/subscriptions",
 			`{"name":"X","type":"enterprise","cost":"1","currency":"RUB","billing_period":"year","start_date":"01.01.2026"}`, 400},
 		{"create bad cost", admin, "POST", "/subscriptions",

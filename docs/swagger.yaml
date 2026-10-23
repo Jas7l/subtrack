@@ -1,0 +1,3388 @@
+basePath: /api/v1
+definitions:
+  analytics.BreakdownResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/analytics.SliceDTO'
+        type: array
+    type: object
+  analytics.ByDepartmentResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/analytics.DepartmentRowDTO'
+        type: array
+    type: object
+  analytics.DepartmentRowDTO:
+    properties:
+      active_users:
+        example: 40
+        type: integer
+      cost_per_user_rub:
+        example: "2300.00"
+        type: string
+      department_id:
+        example: 3
+        type: integer
+      monthly_cost_rub:
+        example: "92000.00"
+        type: string
+      name:
+        example: Разработка
+        type: string
+      seats_total:
+        example: 60
+        type: integer
+      seats_used:
+        example: 48
+        type: integer
+      subscriptions:
+        example: 9
+        type: integer
+      utilization_pct:
+        example: 80
+        type: number
+    type: object
+  analytics.ForecastMonthDTO:
+    properties:
+      estimated_rub:
+        example: "5000.00"
+        type: string
+      month:
+        example: 2026-11
+        type: string
+      payments:
+        example: 12
+        type: integer
+      scheduled_rub:
+        example: "150000.00"
+        type: string
+      total_rub:
+        example: "155000.00"
+        type: string
+    type: object
+  analytics.ForecastResponse:
+    properties:
+      months:
+        items:
+          $ref: '#/definitions/analytics.ForecastMonthDTO'
+        type: array
+      run_rate_rub:
+        example: "2220000.00"
+        type: string
+      total_rub:
+        description: |-
+          TotalRUB sums the months; RunRateRUB is what they would cost if every
+          active subscription were renewed (monthly cost × months).
+        example: "1860000.00"
+        type: string
+      unscheduled:
+        example: 1
+        type: integer
+    type: object
+  analytics.PaymentStatsDTO:
+    properties:
+      failed_count:
+        example: 0
+        type: integer
+      overdue_count:
+        example: 1
+        type: integer
+      paid_this_month_rub:
+        example: "84500.00"
+        type: string
+      paid_this_year_rub:
+        example: "912000.00"
+        type: string
+      pending_count:
+        example: 3
+        type: integer
+      pending_rub:
+        example: "27000.00"
+        type: string
+    type: object
+  analytics.RecommendationDTO:
+    properties:
+      savings_rub_year:
+        example: "120000.00"
+        type: string
+      subscription_ids:
+        items:
+          type: integer
+        type: array
+      text:
+        example: Занято 30 из 50 мест Jira. Сократите 20 мест — сэкономите 120 000
+          ₽/год.
+        type: string
+      title:
+        example: 'Лишние места: Jira'
+        type: string
+      type:
+        enum:
+        - unused_seats
+        - no_holders
+        - duplicate_vendor
+        - individual_to_group
+        - enterprise_low_usage
+        - annual_billing
+        - expired_with_holders
+        example: unused_seats
+        type: string
+    type: object
+  analytics.RecommendationsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/analytics.RecommendationDTO'
+        type: array
+      total_savings_rub_year:
+        description: TotalSavingsRUBYear sums the savings that could be computed.
+        example: "240000.00"
+        type: string
+    type: object
+  analytics.SliceDTO:
+    properties:
+      key:
+        example: Разработка
+        type: string
+      monthly_cost_rub:
+        example: "64000.00"
+        type: string
+      share_pct:
+        example: 34.6
+        type: number
+      subscriptions:
+        example: 6
+        type: integer
+    type: object
+  analytics.SpendingMonthDTO:
+    properties:
+      amount_rub:
+        example: "84500.00"
+        type: string
+      month:
+        example: 2026-10
+        type: string
+      payments:
+        example: 7
+        type: integer
+    type: object
+  analytics.SpendingResponse:
+    properties:
+      from:
+        example: 2025-11
+        type: string
+      months:
+        items:
+          $ref: '#/definitions/analytics.SpendingMonthDTO'
+        type: array
+      to:
+        example: 2026-10
+        type: string
+      total_rub:
+        example: "912000.00"
+        type: string
+    type: object
+  analytics.SummaryDTO:
+    properties:
+      active_subscriptions:
+        example: 24
+        type: integer
+      active_users:
+        example: 95
+        type: integer
+      annual_cost_rub:
+        example: "2220000.00"
+        type: string
+      cost_per_user_rub:
+        example: "1947.37"
+        type: string
+      department_id:
+        example: 3
+        type: integer
+      enterprise_subscriptions:
+        example: 1
+        type: integer
+      expired:
+        example: 1
+        type: integer
+      expiring_soon:
+        example: 2
+        type: integer
+      licences:
+        example: 160
+        type: integer
+      monthly_cost_rub:
+        example: "185000.00"
+        type: string
+      payments:
+        $ref: '#/definitions/analytics.PaymentStatsDTO'
+      potential_savings_rub:
+        example: "240000.00"
+        type: string
+      recommendations:
+        example: 5
+        type: integer
+      seats_free:
+        example: 28
+        type: integer
+      seats_total:
+        example: 140
+        type: integer
+      seats_used:
+        example: 112
+        type: integer
+      utilization_pct:
+        example: 80
+        type: number
+    type: object
+  analytics.TopResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/analytics.TopRowDTO'
+        type: array
+    type: object
+  analytics.TopRowDTO:
+    properties:
+      annual_cost_rub:
+        example: "360000.00"
+        type: string
+      cost_per_licence_rub:
+        example: "1000.00"
+        type: string
+      department_name:
+        example: Разработка
+        type: string
+      monthly_cost_rub:
+        example: "30000.00"
+        type: string
+      name:
+        example: Jira
+        type: string
+      seats_total:
+        example: 50
+        type: integer
+      seats_used:
+        example: 30
+        type: integer
+      status:
+        example: active
+        type: string
+      subscription_id:
+        example: 12
+        type: integer
+      utilization_pct:
+        example: 60
+        type: number
+      vendor:
+        example: Atlassian
+        type: string
+    type: object
+  audit.EntryDTO:
+    properties:
+      action:
+        example: assignment.revoke
+        type: string
+      actor_id:
+        example: 1
+        type: integer
+      actor_name:
+        example: Иванов Иван Иванович
+        type: string
+      created_at:
+        example: "2026-10-23T10:00:00Z"
+        type: string
+      details:
+        type: object
+      entity_id:
+        example: 40
+        type: integer
+      entity_type:
+        example: assignment
+        type: string
+      id:
+        example: 301
+        type: integer
+    type: object
+  audit.ListAuditResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/audit.EntryDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
+  auth.ChangePasswordRequest:
+    properties:
+      current_password:
+        example: change-me-now
+        type: string
+      new_password:
+        example: a-better-password
+        type: string
+    type: object
+  auth.LoginRequest:
+    properties:
+      email:
+        example: admin@company.ru
+        type: string
+      password:
+        example: change-me-now
+        type: string
+    type: object
+  auth.LoginResponse:
+    properties:
+      expires_at:
+        example: "2026-10-22T08:00:00Z"
+        type: string
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+      user:
+        $ref: '#/definitions/auth.MeDTO'
+    type: object
+  auth.MeDTO:
+    properties:
+      created_at:
+        example: "2026-10-21T10:00:00Z"
+        type: string
+      department_id:
+        example: 3
+        type: integer
+      email:
+        example: ivanov@company.ru
+        type: string
+      full_name:
+        example: Иванов Иван Иванович
+        type: string
+      id:
+        example: 1
+        type: integer
+      role:
+        enum:
+        - admin
+        - manager
+        - employee
+        example: employee
+        type: string
+    type: object
+  department.CreateDepartmentRequest:
+    properties:
+      head_id:
+        example: 5
+        type: integer
+      name:
+        example: Разработка
+        type: string
+    type: object
+  department.DepartmentDTO:
+    properties:
+      created_at:
+        example: "2026-10-21T10:00:00Z"
+        type: string
+      employee_count:
+        example: 12
+        type: integer
+      head_id:
+        example: 5
+        type: integer
+      head_name:
+        example: Сидоров Сидор Сидорович
+        type: string
+      id:
+        example: 3
+        type: integer
+      name:
+        example: Разработка
+        type: string
+      updated_at:
+        example: "2026-10-21T10:00:00Z"
+        type: string
+    type: object
+  department.ListDepartmentsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/department.DepartmentDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
+  department.UpdateDepartmentRequest:
+    properties:
+      head_id:
+        example: 5
+        type: integer
+        x-nullable: true
+      name:
+        example: Разработка
+        type: string
+    type: object
+  httpx.ErrorBody:
+    properties:
+      description:
+        example: resource not found
+        type: string
+    type: object
+  notification.ListNotificationsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/notification.NotificationDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+      unread:
+        description: Unread counts all unread notifications, whatever the page.
+        example: 3
+        type: integer
+    type: object
+  notification.MarkAllReadResponse:
+    properties:
+      marked:
+        example: 3
+        type: integer
+    type: object
+  notification.NotificationDTO:
+    properties:
+      body:
+        example: Вам выдана лицензия Figma.
+        type: string
+      created_at:
+        example: "2026-10-23T10:00:00Z"
+        type: string
+      id:
+        example: 88
+        type: integer
+      is_read:
+        example: false
+        type: boolean
+      title:
+        example: 'Заявка одобрена: Figma'
+        type: string
+      type:
+        enum:
+        - subscription_expiring
+        - subscription_expired
+        - payment_due
+        - request_created
+        - request_approved
+        - request_rejected
+        example: request_approved
+        type: string
+    type: object
+  request.ApproveRequest:
+    properties:
+      comment:
+        example: Согласовано
+        type: string
+      subscription:
+        $ref: '#/definitions/request.NewSubscriptionBody'
+      subscription_id:
+        example: 12
+        type: integer
+    type: object
+  request.CreateRequestRequest:
+    properties:
+      currency:
+        example: RUB
+        type: string
+      estimated_cost:
+        example: "1500.00"
+        type: string
+      justification:
+        example: Нужна для макетов нового интерфейса
+        type: string
+      name:
+        example: Figma
+        type: string
+      vendor:
+        example: Figma Inc.
+        type: string
+    type: object
+  request.ListRequestsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/request.RequestDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
+  request.NewSubscriptionBody:
+    properties:
+      billing_period:
+        enum:
+        - month
+        - quarter
+        - year
+        example: month
+        type: string
+      category:
+        example: Дизайн
+        type: string
+      cost:
+        example: "15000.00"
+        type: string
+      currency:
+        example: RUB
+        type: string
+      department_id:
+        example: 3
+        type: integer
+        x-nullable: true
+      end_date:
+        example: "2027-10-31"
+        format: date
+        type: string
+      name:
+        example: Figma
+        type: string
+      next_payment_date:
+        example: "2026-12-01"
+        format: date
+        type: string
+      seats_total:
+        example: 5
+        type: integer
+      start_date:
+        example: "2026-11-01"
+        format: date
+        type: string
+      type:
+        enum:
+        - individual
+        - group
+        - enterprise
+        example: group
+        type: string
+      vendor:
+        example: Figma Inc.
+        type: string
+    type: object
+  request.RejectRequest:
+    properties:
+      comment:
+        example: У отдела уже есть Canva, используйте её
+        type: string
+    type: object
+  request.RequestDTO:
+    properties:
+      admin_comment:
+        example: ""
+        type: string
+      admin_decided_at:
+        example: "2026-10-24T09:00:00Z"
+        type: string
+      admin_id:
+        example: 1
+        type: integer
+      created_at:
+        example: "2026-10-23T10:00:00Z"
+        type: string
+      currency:
+        example: RUB
+        type: string
+      department_id:
+        example: 3
+        type: integer
+      department_name:
+        example: Разработка
+        type: string
+      estimated_cost:
+        example: "1500.00"
+        type: string
+      id:
+        example: 15
+        type: integer
+      justification:
+        example: Нужна для макетов нового интерфейса
+        type: string
+      manager_comment:
+        example: Согласовано
+        type: string
+      manager_decided_at:
+        example: "2026-10-23T12:00:00Z"
+        type: string
+      manager_id:
+        example: 5
+        type: integer
+      name:
+        example: Figma
+        type: string
+      requester_id:
+        example: 7
+        type: integer
+      requester_name:
+        example: Петров Пётр Петрович
+        type: string
+      status:
+        enum:
+        - pending_manager
+        - rejected_by_manager
+        - pending_admin
+        - rejected_by_admin
+        - approved
+        - cancelled
+        example: pending_manager
+        type: string
+      subscription_id:
+        example: 12
+        type: integer
+      updated_at:
+        example: "2026-10-23T10:00:00Z"
+        type: string
+      vendor:
+        example: Figma Inc.
+        type: string
+    type: object
+  settings.NotificationSettingsDTO:
+    properties:
+      expiring_days:
+        example: 7
+        type: integer
+      payment_days:
+        example: 3
+        type: integer
+      updated_at:
+        example: "2026-10-23T10:00:00Z"
+        type: string
+      updated_by:
+        example: 1
+        type: integer
+    type: object
+  settings.PutNotificationSettingsRequest:
+    properties:
+      expiring_days:
+        example: 7
+        type: integer
+      payment_days:
+        example: 3
+        type: integer
+    type: object
+  subscription.AssignRequest:
+    properties:
+      subscription_id:
+        example: 12
+        type: integer
+      user_id:
+        example: 7
+        type: integer
+    type: object
+  subscription.AssignmentDTO:
+    properties:
+      assigned_at:
+        example: "2026-10-23T10:00:00Z"
+        type: string
+      assigned_by:
+        example: 1
+        type: integer
+      id:
+        example: 40
+        type: integer
+      revoked_at:
+        example: "2026-11-02T09:30:00Z"
+        type: string
+      revoked_by:
+        example: 1
+        type: integer
+      status:
+        enum:
+        - active
+        - revoked
+        example: active
+        type: string
+      subscription_id:
+        example: 12
+        type: integer
+      subscription_name:
+        example: Jira
+        type: string
+      user_id:
+        example: 7
+        type: integer
+      user_name:
+        example: Петров Пётр Петрович
+        type: string
+    type: object
+  subscription.CreateSubscriptionRequest:
+    properties:
+      billing_period:
+        enum:
+        - month
+        - quarter
+        - year
+        example: month
+        type: string
+      category:
+        example: Разработка
+        type: string
+      cost:
+        example: "15000.00"
+        type: string
+      currency:
+        example: RUB
+        type: string
+      department_id:
+        example: 3
+        type: integer
+      end_date:
+        example: "2026-12-31"
+        format: date
+        type: string
+      name:
+        example: Jira
+        type: string
+      next_payment_date:
+        example: "2026-11-01"
+        format: date
+        type: string
+      seats_total:
+        example: 20
+        type: integer
+      start_date:
+        example: "2026-01-01"
+        format: date
+        type: string
+      type:
+        enum:
+        - individual
+        - group
+        - enterprise
+        example: group
+        type: string
+      vendor:
+        example: Atlassian
+        type: string
+    type: object
+  subscription.ListAssignmentsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/subscription.AssignmentDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
+  subscription.ListSubscriptionsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/subscription.SubscriptionDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
+  subscription.SubscriptionDTO:
+    properties:
+      billing_period:
+        enum:
+        - month
+        - quarter
+        - year
+        example: month
+        type: string
+      category:
+        example: Разработка
+        type: string
+      cost:
+        example: "15000.00"
+        type: string
+      created_at:
+        example: "2026-10-21T10:00:00Z"
+        type: string
+      created_by:
+        example: 1
+        type: integer
+      currency:
+        example: RUB
+        type: string
+      department_id:
+        example: 3
+        type: integer
+      department_name:
+        example: Разработка
+        type: string
+      end_date:
+        example: "2026-12-31"
+        format: date
+        type: string
+      id:
+        example: 12
+        type: integer
+      name:
+        example: Jira
+        type: string
+      next_payment_date:
+        example: "2026-11-01"
+        format: date
+        type: string
+      seats_free:
+        example: 6
+        type: integer
+      seats_total:
+        description: SeatsTotal and SeatsFree are null for enterprise (unlimited).
+        example: 20
+        type: integer
+      seats_used:
+        example: 14
+        type: integer
+      start_date:
+        example: "2026-01-01"
+        format: date
+        type: string
+      status:
+        enum:
+        - active
+        - expiring_soon
+        - expired
+        - cancelled
+        example: active
+        type: string
+      type:
+        enum:
+        - individual
+        - group
+        - enterprise
+        example: group
+        type: string
+      updated_at:
+        example: "2026-10-21T10:00:00Z"
+        type: string
+      vendor:
+        example: Atlassian
+        type: string
+    type: object
+  subscription.UpdateSubscriptionRequest:
+    properties:
+      billing_period:
+        enum:
+        - month
+        - quarter
+        - year
+        example: month
+        type: string
+      category:
+        example: Разработка
+        type: string
+      cost:
+        example: "15000.00"
+        type: string
+      currency:
+        example: RUB
+        type: string
+      department_id:
+        example: 3
+        type: integer
+        x-nullable: true
+      end_date:
+        example: "2026-12-31"
+        format: date
+        type: string
+        x-nullable: true
+      name:
+        example: Jira
+        type: string
+      next_payment_date:
+        example: "2026-11-01"
+        format: date
+        type: string
+        x-nullable: true
+      seats_total:
+        example: 25
+        type: integer
+      start_date:
+        example: "2026-01-01"
+        format: date
+        type: string
+      status:
+        enum:
+        - active
+        - cancelled
+        example: cancelled
+        type: string
+      type:
+        enum:
+        - individual
+        - group
+        - enterprise
+        example: group
+        type: string
+      vendor:
+        example: Atlassian
+        type: string
+    type: object
+  transaction.CreateTransactionRequest:
+    properties:
+      amount:
+        example: "15000.00"
+        type: string
+      currency:
+        example: RUB
+        type: string
+      invoice_number:
+        example: INV-2026-090
+        type: string
+      payment_date:
+        example: "2026-09-01"
+        format: date
+        type: string
+      payment_method:
+        example: Счёт
+        type: string
+      subscription_id:
+        example: 12
+        type: integer
+    type: object
+  transaction.ListTransactionsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/transaction.TransactionDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
+  transaction.PayTransactionRequest:
+    properties:
+      invoice_number:
+        example: INV-2026-114
+        type: string
+      payment_method:
+        example: Корпоративная карта
+        type: string
+    type: object
+  transaction.TransactionDTO:
+    properties:
+      amount:
+        example: "15000.00"
+        type: string
+      created_at:
+        example: "2026-11-01T00:05:00Z"
+        type: string
+      currency:
+        example: RUB
+        type: string
+      id:
+        example: 40
+        type: integer
+      invoice_number:
+        example: INV-2026-114
+        type: string
+      paid_at:
+        example: "2026-11-01T09:30:00Z"
+        type: string
+      payment_date:
+        example: "2026-11-01"
+        format: date
+        type: string
+      payment_method:
+        example: Корпоративная карта
+        type: string
+      status:
+        enum:
+        - pending
+        - paid
+        - failed
+        example: pending
+        type: string
+      subscription_id:
+        example: 12
+        type: integer
+      subscription_name:
+        example: Jira
+        type: string
+      updated_at:
+        example: "2026-11-01T09:30:00Z"
+        type: string
+    type: object
+  user.CreateUserRequest:
+    properties:
+      department_id:
+        example: 3
+        type: integer
+      email:
+        example: petrov@company.ru
+        type: string
+      full_name:
+        example: Петров Пётр Петрович
+        type: string
+      password:
+        example: initial-password
+        type: string
+      role:
+        enum:
+        - admin
+        - manager
+        - employee
+        example: employee
+        type: string
+    type: object
+  user.ListUsersResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/user.UserDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
+  user.SetPasswordRequest:
+    properties:
+      password:
+        example: temporary-password
+        type: string
+    type: object
+  user.UpdateUserRequest:
+    properties:
+      department_id:
+        example: 3
+        type: integer
+        x-nullable: true
+      email:
+        example: petrov@company.ru
+        type: string
+      full_name:
+        example: Петров Пётр Петрович
+        type: string
+      is_active:
+        example: false
+        type: boolean
+      role:
+        enum:
+        - admin
+        - manager
+        - employee
+        example: manager
+        type: string
+    type: object
+  user.UserDTO:
+    properties:
+      created_at:
+        example: "2026-10-21T10:00:00Z"
+        type: string
+      department_id:
+        example: 3
+        type: integer
+      email:
+        example: petrov@company.ru
+        type: string
+      full_name:
+        example: Петров Пётр Петрович
+        type: string
+      id:
+        example: 7
+        type: integer
+      is_active:
+        example: true
+        type: boolean
+      role:
+        enum:
+        - admin
+        - manager
+        - employee
+        example: employee
+        type: string
+      updated_at:
+        example: "2026-10-21T10:00:00Z"
+        type: string
+    type: object
+info:
+  contact: {}
+  description: |-
+    Учёт корпоративных подписок на ПО: реестр подписок и лицензий, заявки с согласованием (сотрудник → начальник отдела → админ), платежи, уведомления, аудит, аналитика и рекомендации по экономии.
+    Ответ без ошибки — JSON с полем `data`, ошибка — JSON с полем `description`; суть результата передаёт HTTP-статус.
+    Вход: `POST /auth/login`, затем кнопка Authorize и значение `Bearer <token>`.
+  title: SubTrack API
+  version: "1.0"
+paths:
+  /analytics/by-category:
+    get:
+      description: Active subscriptions grouped by category (case-insensitively),
+        most expensive first, with their share. A head gets their own department.
+      parameters:
+      - description: 'Admin: one department'
+        in: query
+        name: department_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.BreakdownResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Monthly cost by category (admin, department head)
+      tags:
+      - analytics
+  /analytics/by-department:
+    get:
+      description: Every department with its active subscriptions' monthly cost, seats,
+        active users and cost per user, most expensive first; department_id null holds
+        the company-wide subscriptions.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.ByDepartmentResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Departments compared (admin)
+      tags:
+      - analytics
+  /analytics/by-vendor:
+    get:
+      description: Active subscriptions grouped by vendor (case-insensitively), most
+        expensive first, with their share. A head gets their own department.
+      parameters:
+      - description: 'Admin: one department'
+        in: query
+        name: department_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.BreakdownResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Monthly cost by vendor (admin, department head)
+      tags:
+      - analytics
+  /analytics/export:
+    get:
+      description: 'One workbook: summary, cost by category, by vendor and (for the
+        whole company) by department, the 20 most expensive subscriptions, paid by
+        month for the last 12 months, a 12-month forecast and the recommendations.'
+      parameters:
+      - description: One department
+        in: query
+        name: department_id
+        type: integer
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Export the analytics to Excel (admin)
+      tags:
+      - analytics
+  /analytics/forecast:
+    get:
+      description: 'Expected spending of the active subscriptions, month by month
+        from this one: payments by next_payment_date and billing period up to the
+        end date, plus the monthly cost of subscriptions without a next_payment_date
+        (estimated). run_rate_rub is the cost if everything were renewed. A head gets
+        their own department.'
+      parameters:
+      - description: 'Admin: one department'
+        in: query
+        name: department_id
+        type: integer
+      - description: How many months (default 12, max 36)
+        in: query
+        name: months
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.ForecastResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Budget forecast (admin, department head)
+      tags:
+      - analytics
+  /analytics/recommendations:
+    get:
+      description: 'Advice from the rules: unused seats, nobody using a subscription,
+        several subscriptions of one vendor, individual copies of one product, an
+        unlimited licence used by few, monthly billing for over a year, an expired
+        subscription with licences still out. Sorted by yearly saving; advice whose
+        saving cannot be computed comes last with savings_rub_year null.'
+      parameters:
+      - description: One department
+        in: query
+        name: department_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.RecommendationsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Savings recommendations (admin)
+      tags:
+      - analytics
+  /analytics/spending:
+    get:
+      description: 'Paid payments summed by the month of their payment date, in roubles
+        at the current rates; every month of the period is present. Default: the last
+        12 months; at most 60.'
+      parameters:
+      - description: One department
+        in: query
+        name: department_id
+        type: integer
+      - description: First month, YYYY-MM
+        in: query
+        name: from
+        type: string
+      - description: 'Last month, YYYY-MM (default: this month)'
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.SpendingResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Paid by month (admin)
+      tags:
+      - analytics
+  /analytics/summary:
+    get:
+      description: Counts, monthly and annual cost in roubles, seat usage, licences
+        and cost per user. The admin may pick a department and also gets payment figures
+        and the recommendations' count and savings; a head always gets their own department
+        and no payment figures.
+      parameters:
+      - description: 'Admin: one department'
+        in: query
+        name: department_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.SummaryDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Dashboard summary (admin, department head)
+      tags:
+      - analytics
+  /analytics/top-subscriptions:
+    get:
+      description: Active subscriptions by monthly cost, with seat usage and the monthly
+        cost per licence handed out.
+      parameters:
+      - description: One department
+        in: query
+        name: department_id
+        type: integer
+      - description: How many (default 10, max 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/analytics.TopResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Most expensive subscriptions (admin)
+      tags:
+      - analytics
+  /assignments:
+    get:
+      description: 'Admin: all. Manager: those of their department''s subscriptions
+        plus their own. Employee: their own. Newest first.'
+      parameters:
+      - description: Only this subscription's
+        in: query
+        name: subscription_id
+        type: integer
+      - description: Only this user's
+        in: query
+        name: user_id
+        type: integer
+      - description: Only this status
+        enum:
+        - active
+        - revoked
+        in: query
+        name: status
+        type: string
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.ListAssignmentsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: List licences
+      tags:
+      - assignments
+    post:
+      consumes:
+      - application/json
+      description: 'Admin: any active or expiring_soon subscription to any active
+        user. Manager: only their department''s subscriptions, only to people of their
+        department. Takes one seat.'
+      parameters:
+      - description: Who gets which subscription
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.AssignRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/subscription.AssignmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Hand out a licence (admin, manager)
+      tags:
+      - assignments
+  /assignments/{id}:
+    get:
+      description: Visible as in the list; anything else is a 404.
+      parameters:
+      - description: Assignment id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.AssignmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Get a licence
+      tags:
+      - assignments
+  /assignments/{id}/revoke:
+    post:
+      description: Frees the seat; the row stays as history. Allowed to the admin,
+        the manager of the subscription's department, and the holder (giving it back).
+      parameters:
+      - description: Assignment id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.AssignmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Revoke a licence
+      tags:
+      - assignments
+  /audit:
+    get:
+      description: Who changed what, newest first. actor_id null means the system.
+        Actions are "<entity>.<verb>", e.g. user.update, subscription.delete, assignment.revoke,
+        request.approve.
+      parameters:
+      - description: Only this user's actions
+        in: query
+        name: actor_id
+        type: integer
+      - description: Only this entity type
+        enum:
+        - user
+        - department
+        - subscription
+        - assignment
+        - request
+        in: query
+        name: entity_type
+        type: string
+      - description: Only this entity (with entity_type)
+        in: query
+        name: entity_id
+        type: integer
+      - description: Only this action
+        in: query
+        name: action
+        type: string
+      - description: From this day (YYYY-MM-DD), inclusive
+        in: query
+        name: from
+        type: string
+      - description: To this day (YYYY-MM-DD), inclusive
+        in: query
+        name: to
+        type: string
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/audit.ListAuditResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Audit trail (admin)
+      tags:
+      - audit
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Checks email and password and returns a JWT. An unknown email and
+        a wrong password both answer 401 with the same message; a blocked account
+        answers 403.
+      parameters:
+      - description: Credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      summary: Sign in
+      tags:
+      - auth
+  /auth/me:
+    get:
+      description: Returns the user the bearer token belongs to.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.MeDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Current user
+      tags:
+      - auth
+  /auth/password:
+    post:
+      consumes:
+      - application/json
+      description: Replaces the caller's password after checking the current one.
+        Issued tokens stay valid.
+      parameters:
+      - description: Current and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ChangePasswordRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Change own password
+      tags:
+      - auth
+  /departments:
+    get:
+      description: 'Admin: all departments, sorted by name. Anyone else: only their
+        own department (zero or one item).'
+      parameters:
+      - description: Substring of the name (admin only)
+        in: query
+        name: q
+        type: string
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/department.ListDepartmentsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: List departments
+      tags:
+      - departments
+    post:
+      consumes:
+      - application/json
+      description: The name is unique case-insensitively. The head, if given, must
+        be an active manager who heads no other department; they are moved into the
+        new department.
+      parameters:
+      - description: Department fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/department.CreateDepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/department.DepartmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Create a department (admin)
+      tags:
+      - departments
+  /departments/{id}:
+    delete:
+      description: 'Only an empty department can be deleted: no active users and no
+        subscriptions (409 otherwise, with the counts). Blocked users and past requests
+        that point at it are detached.'
+      parameters:
+      - description: Department id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Delete a department (admin)
+      tags:
+      - departments
+    get:
+      description: 'Admin: any department. Anyone else: only their own; another department
+        is a 404.'
+      parameters:
+      - description: Department id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/department.DepartmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Get a department
+      tags:
+      - departments
+    patch:
+      consumes:
+      - application/json
+      description: 'Rename and/or change the head; at least one field. A new head
+        must be an active manager who heads no other department and is moved into
+        this one; the previous head stays in the department. `"head_id": null` leaves
+        it without a head.'
+      parameters:
+      - description: Department id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/department.UpdateDepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/department.DepartmentDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Update a department (admin)
+      tags:
+      - departments
+  /notifications:
+    get:
+      description: The caller's own notifications, newest first, with the unread count.
+      parameters:
+      - description: 'true: only unread'
+        in: query
+        name: unread
+        type: boolean
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/notification.ListNotificationsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: My notifications
+      tags:
+      - notifications
+  /notifications/{id}/read:
+    post:
+      parameters:
+      - description: Notification id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/notification.NotificationDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Mark a notification read
+      tags:
+      - notifications
+  /notifications/read-all:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/notification.MarkAllReadResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Mark all my notifications read
+      tags:
+      - notifications
+  /requests:
+    get:
+      description: 'Admin: all. Manager: their department''s plus their own (incoming
+        ones: ?status=pending_manager). Employee: their own. Newest first.'
+      parameters:
+      - description: Only this status
+        enum:
+        - pending_manager
+        - rejected_by_manager
+        - pending_admin
+        - rejected_by_admin
+        - approved
+        - cancelled
+        in: query
+        name: status
+        type: string
+      - description: Only this requester's
+        in: query
+        name: requester_id
+        type: integer
+      - description: Only this department's
+        in: query
+        name: department_id
+        type: integer
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/request.ListRequestsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: List requests
+      tags:
+      - requests
+    post:
+      consumes:
+      - application/json
+      description: An employee's request goes to the head of their department, or
+        straight to the admin when there is no head; a manager's goes to the admin.
+        name and justification are required; currency defaults to RUB.
+      parameters:
+      - description: What is needed and why
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateRequestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/request.RequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Request a subscription (employee, manager)
+      tags:
+      - requests
+  /requests/{id}:
+    get:
+      description: Visible as in the list; anything else is a 404.
+      parameters:
+      - description: Request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/request.RequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Get a request
+      tags:
+      - requests
+  /requests/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: 'The department head moves a pending_manager request to pending_admin.
+        The admin approves a pending_admin request (or a pending_manager one when
+        the department has no head) and picks the subscription: an existing one (subscription_id)
+        or a new one (subscription), and the requester gets a licence of it - all
+        in one transaction. If the licence cannot be handed out (no free seats, cancelled
+        subscription, the requester already holds it) the answer is 409 and the request
+        stays pending.'
+      parameters:
+      - description: Request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Comment and, for the admin, the subscription
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/request.ApproveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/request.RequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Approve a request (department head, admin)
+      tags:
+      - requests
+  /requests/{id}/cancel:
+    post:
+      description: Only the requester, only while the request is pending.
+      parameters:
+      - description: Request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/request.RequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Cancel own request
+      tags:
+      - requests
+  /requests/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: The department head rejects at pending_manager, the admin at pending_admin
+        (or at pending_manager when the department has no head). A comment is required.
+      parameters:
+      - description: Request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Why
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/request.RejectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/request.RequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Reject a request (department head, admin)
+      tags:
+      - requests
+  /settings/notifications:
+    get:
+      description: How many days before the end date a subscription becomes expiring_soon
+        (its holders and the admins are warned), and how many days before the next
+        payment the admins are reminded.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/settings.NotificationSettingsDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Notification settings (admin)
+      tags:
+      - settings
+    put:
+      consumes:
+      - application/json
+      description: Both values are required, each 0..365 days (0 = only on the day
+        itself). The scheduler uses the new values from its next run.
+      parameters:
+      - description: New values
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/settings.PutNotificationSettingsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/settings.NotificationSettingsDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Change the notification settings (admin)
+      tags:
+      - settings
+  /subscriptions:
+    get:
+      description: 'Admin: all. Manager: their department''s plus the ones they hold
+        a licence of. Employee: the ones they hold a licence of. Deleted subscriptions
+        are never listed. Sorted by name.'
+      parameters:
+      - description: Only this department's
+        in: query
+        name: department_id
+        type: integer
+      - description: Whole category, case-insensitive
+        in: query
+        name: category
+        type: string
+      - description: Only this status
+        enum:
+        - active
+        - expiring_soon
+        - expired
+        - cancelled
+        in: query
+        name: status
+        type: string
+      - description: Only this type
+        enum:
+        - individual
+        - group
+        - enterprise
+        in: query
+        name: type
+        type: string
+      - description: end_date on or after (YYYY-MM-DD)
+        in: query
+        name: end_from
+        type: string
+      - description: end_date on or before (YYYY-MM-DD)
+        in: query
+        name: end_to
+        type: string
+      - description: Substring of the name or vendor
+        in: query
+        name: q
+        type: string
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.ListSubscriptionsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: List subscriptions
+      tags:
+      - subscriptions
+    post:
+      consumes:
+      - application/json
+      description: Starts active with no licences handed out. individual always has
+        1 seat; group needs seats_total; enterprise is unlimited (no seats_total).
+        The currency must exist in the currencies table.
+      parameters:
+      - description: Subscription fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.CreateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/subscription.SubscriptionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Create a subscription (admin)
+      tags:
+      - subscriptions
+  /subscriptions/{id}:
+    delete:
+      description: 'Soft delete: the row stays for payment history, but is no longer
+        listed. Every licence is revoked.'
+      parameters:
+      - description: Subscription id
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Delete a subscription (admin)
+      tags:
+      - subscriptions
+    get:
+      description: Visible as in the list; anything else is a 404.
+      parameters:
+      - description: Subscription id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.SubscriptionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Get a subscription
+      tags:
+      - subscriptions
+    patch:
+      consumes:
+      - application/json
+      description: 'Partial update; at least one field. status may be set to active
+        or cancelled only (expiring_soon and expired are set by the scheduler); cancelling
+        revokes every licence. seats_total cannot go below seats_used (409). Changing
+        type without seats_total resets the seats: 1 for individual, unlimited for
+        enterprise, group then needs seats_total.'
+      parameters:
+      - description: Subscription id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.UpdateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.SubscriptionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Update a subscription (admin)
+      tags:
+      - subscriptions
+  /subscriptions/export:
+    get:
+      description: Every subscription matching the same filters as the list, as an
+        .xlsx sheet.
+      parameters:
+      - description: Only this department
+        in: query
+        name: department_id
+        type: integer
+      - description: Category, case-insensitive
+        in: query
+        name: category
+        type: string
+      - description: active | expiring_soon | expired | cancelled
+        in: query
+        name: status
+        type: string
+      - description: individual | group | enterprise
+        in: query
+        name: type
+        type: string
+      - description: end_date from, inclusive (YYYY-MM-DD)
+        in: query
+        name: end_from
+        type: string
+      - description: end_date to, inclusive (YYYY-MM-DD)
+        in: query
+        name: end_to
+        type: string
+      - description: Substring of name or vendor
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Export subscriptions to Excel (admin)
+      tags:
+      - subscriptions
+  /transactions:
+    get:
+      description: 'By payment date, newest first (`order=asc`: oldest first). Expected
+        payments: `status=pending&order=asc`.'
+      parameters:
+      - description: Only this subscription
+        in: query
+        name: subscription_id
+        type: integer
+      - description: pending | paid | failed
+        in: query
+        name: status
+        type: string
+      - description: payment_date from, inclusive (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: payment_date to, inclusive (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      - description: desc (default) | asc
+        in: query
+        name: order
+        type: string
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transaction.ListTransactionsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: List payments (admin)
+      tags:
+      - transactions
+    post:
+      consumes:
+      - application/json
+      description: A one-off payment or a past one; it is stored as paid. Cancelled
+        and expired subscriptions are accepted too. 409 when the subscription already
+        has a payment on that date.
+      parameters:
+      - description: The payment
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/transaction.CreateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/transaction.TransactionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Enter a payment by hand (admin)
+      tags:
+      - transactions
+  /transactions/{id}:
+    get:
+      parameters:
+      - description: Transaction id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transaction.TransactionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Get a payment (admin)
+      tags:
+      - transactions
+  /transactions/{id}/fail:
+    post:
+      description: Only from pending. A failed payment can still be paid later.
+      parameters:
+      - description: Transaction id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transaction.TransactionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Mark a payment failed (admin)
+      tags:
+      - transactions
+  /transactions/{id}/pay:
+    post:
+      consumes:
+      - application/json
+      description: From pending or failed. The body is optional; a given payment_method
+        or invoice_number is stored.
+      parameters:
+      - description: Transaction id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Payment details
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/transaction.PayTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transaction.TransactionDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Mark a payment paid (admin)
+      tags:
+      - transactions
+  /transactions/export:
+    get:
+      description: 'Every payment matching the same filters as the list, as an .xlsx
+        sheet, by payment date (newest first; `order=asc`: oldest first).'
+      parameters:
+      - description: Only this subscription
+        in: query
+        name: subscription_id
+        type: integer
+      - description: pending | paid | failed
+        in: query
+        name: status
+        type: string
+      - description: payment_date from, inclusive (YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: payment_date to, inclusive (YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      - description: desc (default) | asc
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Export payments to Excel (admin)
+      tags:
+      - transactions
+  /users:
+    get:
+      description: 'Admin: all users. Manager: only their department (the department_id
+        filter is ignored). Employee: 403. Sorted by full name.'
+      parameters:
+      - description: Only users of this department
+        in: query
+        name: department_id
+        type: integer
+      - description: Only this role
+        enum:
+        - admin
+        - manager
+        - employee
+        in: query
+        name: role
+        type: string
+      - description: 'true: only active, false: only blocked'
+        in: query
+        name: active
+        type: boolean
+      - description: Substring of full name or email
+        in: query
+        name: q
+        type: string
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.ListUsersResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: The admin sets the initial password and hands it to the person.
+        The email is unique case-insensitively (409 on a clash).
+      parameters:
+      - description: User fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/user.UserDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Create a user (admin)
+      tags:
+      - users
+  /users/{id}:
+    get:
+      description: 'Admin: any user. Manager: users of their department. Employee:
+        only themselves. A user outside the caller''s view is a 404.'
+      parameters:
+      - description: User id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.UserDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Get a user
+      tags:
+      - users
+    patch:
+      consumes:
+      - application/json
+      description: 'Partial update; at least one field. `"is_active": false` blocks
+        the user (their tokens stop working at once), `true` unblocks. `"department_id":
+        null` removes them from their department. If the user headed a department
+        and is blocked, demoted or moved out of it, that department is left without
+        a head. Blocking also revokes all their licences. An admin cannot block themselves
+        or drop their own admin role (409).'
+      parameters:
+      - description: User id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.UserDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Update a user (admin)
+      tags:
+      - users
+  /users/{id}/password:
+    put:
+      consumes:
+      - application/json
+      description: Sets a new password, e.g. when the person forgot theirs. Issued
+        tokens stay valid.
+      parameters:
+      - description: User id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: New password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.SetPasswordRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Reset a user's password (admin)
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    description: JWT из POST /auth/login в виде «Bearer <token>».
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

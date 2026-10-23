@@ -115,6 +115,22 @@ func (s *Service) List(ctx context.Context, f domain.TransactionFilter, p paging
 	return items, total, err
 }
 
+// All returns every payment matching f, by payment date (newest first, or
+// oldest first with paging.SortAsc), page by page, for an export.
+func (s *Service) All(ctx context.Context, f domain.TransactionFilter, order paging.SortOrder) ([]domain.Transaction, error) {
+	var out []domain.Transaction
+	for p := (paging.Params{Limit: paging.MaxLimit, Order: order}); ; p.Offset += p.Limit {
+		items, total, err := s.List(ctx, f, p)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, items...)
+		if len(items) == 0 || int64(len(out)) >= total {
+			return out, nil
+		}
+	}
+}
+
 // CreateInput is a payment the admin enters by hand.
 type CreateInput struct {
 	SubscriptionID int64

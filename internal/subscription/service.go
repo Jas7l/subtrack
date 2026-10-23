@@ -178,6 +178,22 @@ func (s *Service) List(ctx context.Context, actor domain.User, f domain.Subscrip
 	return items, total, err
 }
 
+// All returns every subscription visible to actor that matches f, page by
+// page, for an export.
+func (s *Service) All(ctx context.Context, actor domain.User, f domain.SubscriptionFilter) ([]domain.Subscription, error) {
+	var out []domain.Subscription
+	for p := (paging.Params{Limit: paging.MaxLimit}); ; p.Offset += p.Limit {
+		items, total, err := s.List(ctx, actor, f, p)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, items...)
+		if len(items) == 0 || int64(len(out)) >= total {
+			return out, nil
+		}
+	}
+}
+
 // Create validates sub and inserts it as an active subscription with no
 // licences handed out, recording actor as its creator. ID, Status, SeatsUsed,
 // CreatedBy and the timestamps of sub are ignored. SeatsTotal is required for

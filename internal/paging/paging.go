@@ -30,6 +30,10 @@ type Params struct {
 	Order SortOrder
 }
 
+// MaxLimit is the largest page a List endpoint returns; exports read page
+// after page of it.
+const MaxLimit = maxListLimit
+
 const (
 	defaultListLimit = 50
 	maxListLimit     = 200

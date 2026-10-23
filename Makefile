@@ -1,4 +1,4 @@
-.PHONY: install.dep lint vet test build run clean
+.PHONY: install.dep lint vet test build run clean swagger
 
 PROJECTNAME ?= subtrack
 PROJECT_VERSION ?= 0.0.0
@@ -31,3 +31,13 @@ run: build
 clean:
 	go clean
 	rm -rf $(BUILD_DIR)
+
+# swagger regenerates docs/ (the OpenAPI spec the server serves on /swagger/)
+# from the annotations: the general info on main() in cmd/server/main.go and
+# a godoc block on every handler. Run it after changing a route or a DTO and
+# commit docs/ with the change; TestSpecMatchesRouter fails otherwise.
+SWAG ?= go run github.com/swaggo/swag/cmd/swag@v1.16.6
+
+swagger:
+	$(SWAG) fmt -g cmd/server/main.go
+	$(SWAG) init -g cmd/server/main.go -o docs --parseInternal --outputTypes go,json,yaml
