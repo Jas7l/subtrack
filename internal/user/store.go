@@ -1,10 +1,8 @@
-// Package user owns persistence of subtrack.users. The *Store here satisfies,
-// structurally, the small repo interfaces declared by its consumers (the auth
-// service today); the package does not import them.
 package user
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -114,4 +112,165 @@ func (s *Store) SetPasswordHash(ctx context.Context, id int64, hash string) erro
 		return storage.ErrNotFound
 	}
 	return nil
+}
+
+// List returns one page of users matching f, ordered by full name, plus the
+// total number of matches (ignoring limit/offset).
+//
+// Errors:
+//   - any db error wrapped as "postgres: count users: ..." / "list users ...".
+func (s *Store) List(ctx context.Context, f domain.UserFilter, limit, offset int) ([]domain.User, int64, error) {
+	conds := make([]string, 0, 4)
+	args := make([]any, 0, 6)
+	add := func(cond string, v any) {
+		args = append(args, v)
+		conds = append(conds, strings.ReplaceAll(cond, "?", "$"+pg.Itoa(len(args))))
+	}
+	if f.DepartmentID != nil {
+		add("department_id = ?", *f.DepartmentID)
+	}
+	if f.Role != nil {
+		add("role = ?", string(*f.Role))
+	}
+	if f.Active != nil {
+		add("is_active = ?", *f.Active)
+	}
+	if f.Query != "" {
+		add("(full_name ILIKE ? OR email ILIKE ?)", "%"+pg.EscapeLike(f.Query)+"%")
+	}
+	where := ""
+	if len(conds) > 0 {
+		where = " WHERE " + strings.Join(conds, " AND ")
+	}
+
+	var total int64
+	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM subtrack.users`+where, args...).Scan(&total); err != nil {
+		return nil, 0, pg.Translate(ctx, "count users", err)
+	}
+
+	args = append(args, limit, offset)
+	q := `SELECT ` + userColumns + ` FROM subtrack.users` + where +
+		` ORDER BY full_name, id LIMIT $` + pg.Itoa(len(args)-1) + ` OFFSET $` + pg.Itoa(len(args))
+	rows, err := s.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, 0, pg.Translate(ctx, "list users", err)
+	}
+	defer rows.Close()
+
+	out := make([]domain.User, 0, limit)
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, 0, pg.Translate(ctx, "list users scan", err)
+		}
+		out = append(out, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, pg.Translate(ctx, "list users rows", err)
+	}
+	return out, total, nil
+}
+
+// Update applies a partial patch to a user and returns the row as it stands
+// afterwards. Only the fields set in p are written; updated_at is always
+// bumped. The service rejects an empty patch before calling this.
+//
+// In the same transaction it keeps two invariants:
+//   - the department-head one (see domain.Department): if the user headed a
+//     department and after the update is no longer an active manager of that
+//     very department, the department is left without a head;
+//   - a blocked user holds no licences: blocking revokes every active
+//     assignment of theirs on behalf of actorID and frees the seats.
+//
+// Errors:
+//   - storage.ErrNotFound when no row has that id.
+//   - *storage.ConstraintError "users_email_key" when the new email is taken.
+//   - wrapped storage.ErrNotFound when DepartmentID names no department.
+//   - any other db error wrapped as "postgres: update user: ...".
+func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorID int64) (domain.User, error) {
+	sets := make([]string, 0, 6)
+	args := make([]any, 0, 6)
+	add := func(col string, v any) {
+		args = append(args, v)
+		sets = append(sets, col+" = $"+pg.Itoa(len(args)))
+	}
+	if p.FullName != nil {
+		add("full_name", *p.FullName)
+	}
+	if p.Email != nil {
+		add("email", *p.Email)
+	}
+	if p.Role != nil {
+		add("role", string(*p.Role))
+	}
+	if p.DepartmentID.Set {
+		add("department_id", p.DepartmentID.Value)
+	}
+	if p.IsActive != nil {
+		add("is_active", *p.IsActive)
+	}
+	sets = append(sets, "updated_at = NOW()")
+	args = append(args, id)
+	q := `UPDATE subtrack.users SET ` + strings.Join(sets, ", ") +
+		` WHERE id = $` + pg.Itoa(len(args)) + ` RETURNING ` + userColumns
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return domain.User{}, pg.Translate(ctx, "begin update user", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	u, err := scanUser(tx.QueryRow(ctx, q, args...))
+	if err != nil {
+		return domain.User{}, pg.Translate(ctx, "update user", err)
+	}
+
+	// $3 may be NULL (no department); IS NOT DISTINCT FROM treats that as
+	// "not this department", so the head is cleared.
+	const clearHead = `
+	UPDATE subtrack.departments SET head_id = NULL, updated_at = NOW()
+	WHERE head_id = $1 AND NOT ($2::bool AND id IS NOT DISTINCT FROM $3::bigint)`
+	stillHead := u.Role == domain.RoleManager && u.IsActive
+	if _, err := tx.Exec(ctx, clearHead, u.ID, stillHead, u.DepartmentID); err != nil {
+		return domain.User{}, pg.Translate(ctx, "update user clear head", err)
+	}
+	if !u.IsActive {
+		if err := revokeLicences(ctx, tx, u.ID, actorID); err != nil {
+			return domain.User{}, pg.Translate(ctx, "update user revoke licences", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.User{}, pg.Translate(ctx, "commit update user", err)
+	}
+	return u, nil
+}
+
+// revokeLicences revokes every active licence of userID on behalf of actorID
+// and frees the seats. The subscriptions are locked before their assignments,
+// in the order the subscription store uses, so this cannot deadlock with a
+// concurrent cancel or revoke. Nothing to revoke (e.g. an already blocked
+// user being edited) is a no-op.
+func revokeLicences(ctx context.Context, tx pgx.Tx, userID, actorID int64) error {
+	_, err := tx.Exec(ctx, `
+		SELECT s.id FROM subtrack.subscriptions s
+		JOIN subtrack.subscription_assignments a ON a.subscription_id = s.id
+		WHERE a.user_id = $1 AND a.status = 'active'
+		ORDER BY s.id
+		FOR UPDATE OF s`, userID)
+	if err != nil {
+		return err
+	}
+	// A user holds at most one active licence per subscription (unique index
+	// subscription_assignments_active_key), so each subscription is joined
+	// once and loses exactly one seat.
+	_, err = tx.Exec(ctx, `
+		WITH revoked AS (
+		    UPDATE subtrack.subscription_assignments
+		    SET status = 'revoked', revoked_at = NOW(), revoked_by = $2
+		    WHERE user_id = $1 AND status = 'active'
+		    RETURNING subscription_id)
+		UPDATE subtrack.subscriptions s SET seats_used = s.seats_used - 1, updated_at = NOW()
+		FROM revoked r WHERE s.id = r.subscription_id`, userID, actorID)
+	return err
 }

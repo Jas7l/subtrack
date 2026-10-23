@@ -15,7 +15,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"subtrack/internal/auth"
+	"subtrack/internal/department"
 	"subtrack/internal/httpx"
+	"subtrack/internal/subscription"
 	"subtrack/internal/user"
 )
 
@@ -36,6 +38,7 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	api.NotFoundHandler = r.NotFoundHandler
 
 	users := user.NewStore(pool)
+	depts := department.NewStore(pool)
 	authSvc := auth.New(users, authCfg)
 	if err := authSvc.EnsureAdmin(ctx, authCfg.Bootstrap); err != nil {
 		return err
@@ -49,5 +52,8 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	protected.Use(authSvc.Middleware)
 
 	auth.RegisterRoutes(api, protected, authSvc)
+	user.RegisterRoutes(protected, user.New(users, depts))
+	department.RegisterRoutes(protected, department.New(depts, users))
+	subscription.RegisterRoutes(protected, subscription.New(subscription.NewStore(pool), users, depts))
 	return nil
 }

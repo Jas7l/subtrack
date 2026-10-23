@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +18,14 @@ import (
 
 // Itoa is a small helper for building dynamic SQL placeholders ($1, $2, …).
 func Itoa(n int) string { return strconv.Itoa(n) }
+
+// likeEscaper backs EscapeLike: % and _ are wildcards in a LIKE pattern, and
+// backslash is its default escape character.
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// EscapeLike makes s match literally inside a LIKE / ILIKE pattern, so a
+// search for "50%" does not match everything that starts with "50".
+func EscapeLike(s string) string { return likeEscaper.Replace(s) }
 
 // SortDir renders the ORDER BY direction the list endpoints share: ASC when the
 // caller asked for oldest-first, DESC otherwise.
@@ -94,6 +103,8 @@ func NewPool(ctx context.Context, c Config) (*pgxpool.Pool, error) {
 //     name so services can tell which uniqueness rule fired).
 //   - SQLSTATE 23503 (foreign_key_violation) → wrapped storage.ErrNotFound:
 //     "a referenced row is missing" rather than "the target row is missing".
+//   - SQLSTATE 23514 (check_violation)       → *storage.CheckError carrying
+//     the constraint name.
 //   - anything else                          → `postgres: <op>: %w` of err,
 //     preserving the original via errors.Is / errors.As.
 func Translate(ctx context.Context, op string, err error) error {
@@ -114,6 +125,10 @@ func Translate(ctx context.Context, op string, err error) error {
 			logger.Op(ctx, "postgres."+op).Warn("foreign key violation",
 				"constraint", pgErr.ConstraintName, "detail", pgErr.Detail)
 			return fmt.Errorf("postgres: %s: %w (fk: %s)", op, storage.ErrNotFound, pgErr.ConstraintName)
+		case "23514": // check_violation
+			logger.Op(ctx, "postgres."+op).Warn("check violation",
+				"constraint", pgErr.ConstraintName, "detail", pgErr.Detail)
+			return &storage.CheckError{Constraint: pgErr.ConstraintName}
 		}
 		logger.Op(ctx, "postgres."+op).Error("db error",
 			"sqlstate", pgErr.Code, "message", pgErr.Message, "detail", pgErr.Detail, "constraint", pgErr.ConstraintName)

@@ -1,0 +1,422 @@
+// Package subscription keeps the company's registry of software subscriptions
+// and the licences handed out from them.
+//
+// Who does what:
+//   - the admin creates, edits, cancels and deletes subscriptions and hands
+//     out licences of any of them to any active user;
+//   - a manager sees their department's subscriptions and hands out their
+//     licences to the people of their department;
+//   - everybody sees the subscriptions they hold a licence for and may give a
+//     licence back.
+//
+// Anything outside the caller's view is a 404, as everywhere else.
+//
+// Seats: individual is always one seat, group has seats_total seats,
+// enterprise is unlimited. seats_used counts active licences and moves only
+// with assignments; the database refuses more licences than seats, and an
+// edit that would leave seats_total below seats_used. Cancelling or deleting a
+// subscription revokes all its licences in the same transaction.
+package subscription
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
+
+	"subtrack/internal/apperr"
+	"subtrack/internal/domain"
+	"subtrack/internal/logger"
+	"subtrack/internal/paging"
+	"subtrack/internal/storage"
+)
+
+var (
+	// ErrSubscriptionNotFound is returned when the subscription does not
+	// exist, is deleted, or is outside the caller's view. Mapped to 404.
+	ErrSubscriptionNotFound = errors.New("service: subscription not found")
+
+	// ErrUnknownDepartment is returned when department_id names no
+	// department. Mapped to 400.
+	ErrUnknownDepartment = errors.New("service: invalid input: department does not exist")
+
+	// ErrUnknownCurrency is returned when the currency is not in the
+	// currencies table. Mapped to 400.
+	ErrUnknownCurrency = errors.New("service: invalid input: unknown currency")
+
+	// ErrSeatsBelowUsed is returned when an edit would leave fewer seats than
+	// licences in use. Mapped to 409.
+	ErrSeatsBelowUsed = errors.New("service: seats_total cannot be lower than the number of seats in use; revoke licences first")
+)
+
+// repo is the slice of persistence the service needs; *Store satisfies it.
+type repo interface {
+	GetByID(ctx context.Context, id int64) (domain.Subscription, error)
+	List(ctx context.Context, f domain.SubscriptionFilter, sc *domain.SubscriptionScope, limit, offset int) ([]domain.Subscription, int64, error)
+	CurrencyExists(ctx context.Context, code string) (bool, error)
+	Create(ctx context.Context, s domain.Subscription) (domain.Subscription, error)
+	Update(ctx context.Context, s domain.Subscription, actorID int64) (domain.Subscription, error)
+	Delete(ctx context.Context, id, actorID int64) error
+
+	GetAssignment(ctx context.Context, id int64) (domain.Assignment, error)
+	HasActiveAssignment(ctx context.Context, subID, userID int64) (bool, error)
+	ListAssignments(ctx context.Context, f domain.AssignmentFilter, sc *domain.SubscriptionScope, limit, offset int) ([]domain.Assignment, int64, error)
+	Assign(ctx context.Context, subID, userID, actorID int64) (domain.Assignment, error)
+	Revoke(ctx context.Context, id, actorID int64) (domain.Assignment, error)
+}
+
+// users is what the service needs to vet an assignee; *user.Store satisfies
+// it structurally.
+type users interface {
+	GetByID(ctx context.Context, id int64) (domain.User, error)
+}
+
+// departments is what the service needs to know about departments: whether
+// one exists. *department.Store satisfies it structurally.
+type departments interface {
+	GetByID(ctx context.Context, id int64) (domain.Department, error)
+}
+
+// Service implements the subscriptions and assignments use cases.
+type Service struct {
+	repo  repo
+	users users
+	depts departments
+}
+
+// New wires a Service over its repo and the users and departments readers.
+func New(r repo, u users, d departments) *Service {
+	return &Service{repo: r, users: u, depts: d}
+}
+
+// scopeFor returns what actor may see: everything for the admin; their
+// department's subscriptions plus their own licences for a manager; only
+// their own licences for an employee.
+func scopeFor(actor domain.User) *domain.SubscriptionScope {
+	switch actor.Role {
+	case domain.RoleAdmin:
+		return nil
+	case domain.RoleManager:
+		return &domain.SubscriptionScope{DepartmentID: actor.DepartmentID, HolderID: &actor.ID}
+	}
+	return &domain.SubscriptionScope{HolderID: &actor.ID}
+}
+
+// manages reports whether actor may hand out licences of a subscription
+// owned by deptID: the admin always, a manager only for their own
+// department.
+func manages(actor domain.User, deptID *int64) bool {
+	switch actor.Role {
+	case domain.RoleAdmin:
+		return true
+	case domain.RoleManager:
+		return actor.DepartmentID != nil && deptID != nil && *actor.DepartmentID == *deptID
+	}
+	return false
+}
+
+// visible reports whether actor may see sub: whoever manages it, and whoever
+// holds a licence of it.
+func (s *Service) visible(ctx context.Context, actor domain.User, sub domain.Subscription) (bool, error) {
+	if manages(actor, sub.DepartmentID) {
+		return true, nil
+	}
+	return s.repo.HasActiveAssignment(ctx, sub.ID, actor.ID)
+}
+
+// Get returns one subscription as actor is allowed to see it.
+//
+// Errors:
+//   - ErrSubscriptionNotFound when it does not exist, is deleted or is
+//     outside actor's view.
+//   - any other datastore failure, propagated.
+func (s *Service) Get(ctx context.Context, actor domain.User, id int64) (domain.Subscription, error) {
+	logger.Op(ctx, "subscription.Service.Get").Debug("start", "id", id)
+	sub, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return domain.Subscription{}, apperr.MapStorage(err, ErrSubscriptionNotFound)
+	}
+	ok, err := s.visible(ctx, actor, sub)
+	if err != nil {
+		return domain.Subscription{}, err
+	}
+	if !ok {
+		return domain.Subscription{}, ErrSubscriptionNotFound
+	}
+	return sub, nil
+}
+
+// List returns one page of the subscriptions visible to actor that match f.
+func (s *Service) List(ctx context.Context, actor domain.User, f domain.SubscriptionFilter, p paging.Params) ([]domain.Subscription, int64, error) {
+	log := logger.Op(ctx, "subscription.Service.List")
+	p.Normalize()
+	f.Query = strings.TrimSpace(f.Query)
+	f.Category = strings.TrimSpace(f.Category)
+
+	items, total, err := s.repo.List(ctx, f, scopeFor(actor), p.Limit, p.Offset)
+	if err == nil {
+		log.Debug("done", "count", len(items), "total", total, "limit", p.Limit, "offset", p.Offset)
+	}
+	return items, total, err
+}
+
+// Create validates sub and inserts it as an active subscription with no
+// licences handed out, recording actor as its creator. ID, Status, SeatsUsed,
+// CreatedBy and the timestamps of sub are ignored. SeatsTotal is required for
+// group, must be absent (or 1) for individual and absent for enterprise.
+//
+// Errors:
+//   - apperr.ErrInvalidInput for a missing or malformed field.
+//   - ErrUnknownDepartment, ErrUnknownCurrency as their names say.
+//   - any other datastore failure, propagated.
+func (s *Service) Create(ctx context.Context, actor domain.User, sub domain.Subscription) (domain.Subscription, error) {
+	log := logger.Op(ctx, "subscription.Service.Create")
+	log.Debug("start", "name", sub.Name, "type", sub.Type)
+
+	sub.Status = domain.SubActive
+	sub.CreatedBy = &actor.ID
+	if err := normalize(&sub); err != nil {
+		return domain.Subscription{}, err
+	}
+	if err := s.checkRefs(ctx, sub.Currency, sub.DepartmentID); err != nil {
+		return domain.Subscription{}, err
+	}
+	out, err := s.repo.Create(ctx, sub)
+	if err != nil {
+		return domain.Subscription{}, mapWriteErr(err)
+	}
+	log.Info("subscription created", "id", out.ID, "type", out.Type, "department_id", out.DepartmentID)
+	return out, nil
+}
+
+// Update applies a partial patch on behalf of actor (an admin). People may
+// set the status to active or cancelled only; expiring_soon and expired are
+// the scheduler's. Cancelling revokes every licence in the same transaction.
+// Changing the type without seats_total resets the seats to the new type's
+// default (1 for individual, unlimited for enterprise; group then needs
+// seats_total).
+//
+// Errors:
+//   - apperr.ErrInvalidInput for an empty patch or an invalid value.
+//   - ErrSubscriptionNotFound, ErrUnknownDepartment, ErrUnknownCurrency.
+//   - ErrSeatsBelowUsed when seats_total would fall below seats_used.
+//   - any other datastore failure, propagated.
+func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p domain.SubscriptionPatch) (domain.Subscription, error) {
+	log := logger.Op(ctx, "subscription.Service.Update")
+	log.Debug("start", "id", id)
+
+	if !p.HasAny() {
+		return domain.Subscription{}, fmt.Errorf("%w: at least one field must be provided", apperr.ErrInvalidInput)
+	}
+	if p.Status != nil && *p.Status != domain.SubActive && *p.Status != domain.SubCancelled {
+		return domain.Subscription{}, fmt.Errorf("%w: status may be set to active or cancelled only", apperr.ErrInvalidInput)
+	}
+	cur, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return domain.Subscription{}, apperr.MapStorage(err, ErrSubscriptionNotFound)
+	}
+
+	sub := apply(cur, p)
+	if err := normalize(&sub); err != nil {
+		return domain.Subscription{}, err
+	}
+	currency := ""
+	if sub.Currency != cur.Currency {
+		currency = sub.Currency
+	}
+	var dept *int64
+	if p.DepartmentID.Set {
+		dept = sub.DepartmentID
+	}
+	if err := s.checkRefs(ctx, currency, dept); err != nil {
+		return domain.Subscription{}, err
+	}
+
+	out, err := s.repo.Update(ctx, sub, actor.ID)
+	if err != nil {
+		return domain.Subscription{}, mapWriteErr(err)
+	}
+	if cur.Status != domain.SubCancelled && out.Status == domain.SubCancelled {
+		log.Info("subscription cancelled, licences revoked", "id", id, "revoked", cur.SeatsUsed)
+	}
+	log.Info("subscription updated", "id", id)
+	return out, nil
+}
+
+// Delete soft-deletes a subscription and revokes its licences on behalf of
+// actor (an admin).
+//
+// Errors:
+//   - ErrSubscriptionNotFound when no live subscription has that id.
+//   - any other datastore failure, propagated.
+func (s *Service) Delete(ctx context.Context, actor domain.User, id int64) error {
+	log := logger.Op(ctx, "subscription.Service.Delete")
+	if err := s.repo.Delete(ctx, id, actor.ID); err != nil {
+		return apperr.MapStorage(err, ErrSubscriptionNotFound)
+	}
+	log.Info("subscription deleted", "id", id)
+	return nil
+}
+
+// apply returns cur with the fields of p written over it.
+func apply(cur domain.Subscription, p domain.SubscriptionPatch) domain.Subscription {
+	s := cur
+	if p.Name != nil {
+		s.Name = *p.Name
+	}
+	if p.Vendor != nil {
+		s.Vendor = *p.Vendor
+	}
+	if p.Category != nil {
+		s.Category = *p.Category
+	}
+	if p.Type != nil && *p.Type != cur.Type {
+		s.Type = *p.Type
+		// The old seat count belonged to the old type; normalize sets the
+		// new type's default unless the patch gives one.
+		s.SeatsTotal = nil
+	}
+	if p.SeatsTotal != nil {
+		s.SeatsTotal = p.SeatsTotal
+	}
+	if p.Cost != nil {
+		s.Cost = *p.Cost
+	}
+	if p.Currency != nil {
+		s.Currency = *p.Currency
+	}
+	if p.BillingPeriod != nil {
+		s.BillingPeriod = *p.BillingPeriod
+	}
+	if p.StartDate != nil {
+		s.StartDate = *p.StartDate
+	}
+	if p.EndDate.Set {
+		s.EndDate = p.EndDate.Value
+	}
+	if p.NextPaymentDate.Set {
+		s.NextPaymentDate = p.NextPaymentDate.Value
+	}
+	if p.Status != nil {
+		s.Status = *p.Status
+	}
+	if p.DepartmentID.Set {
+		s.DepartmentID = p.DepartmentID.Value
+	}
+	return s
+}
+
+// costRe is a non-negative amount that fits NUMERIC(14,2).
+var costRe = regexp.MustCompile(`^[0-9]{1,12}(\.[0-9]{1,2})?$`)
+
+// currencyRe is an ISO 4217 code, after upper-casing.
+var currencyRe = regexp.MustCompile(`^[A-Z]{3}$`)
+
+// normalize trims and validates a whole subscription and fills in the seats
+// its type implies.
+func normalize(s *domain.Subscription) error {
+	s.Name = strings.TrimSpace(s.Name)
+	s.Vendor = strings.TrimSpace(s.Vendor)
+	s.Category = strings.TrimSpace(s.Category)
+	s.Cost = strings.TrimSpace(s.Cost)
+	s.Currency = strings.ToUpper(strings.TrimSpace(s.Currency))
+
+	var missing []string
+	if s.Name == "" {
+		missing = append(missing, "name")
+	}
+	if s.Type == "" {
+		missing = append(missing, "type")
+	}
+	if s.Cost == "" {
+		missing = append(missing, "cost")
+	}
+	if s.Currency == "" {
+		missing = append(missing, "currency")
+	}
+	if s.BillingPeriod == "" {
+		missing = append(missing, "billing_period")
+	}
+	if s.StartDate.IsZero() {
+		missing = append(missing, "start_date")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("%w: missing required fields: %s", apperr.ErrInvalidInput, strings.Join(missing, ", "))
+	}
+
+	if !s.Type.Valid() {
+		return fmt.Errorf("%w: type must be one of individual, group, enterprise", apperr.ErrInvalidInput)
+	}
+	if !s.BillingPeriod.Valid() {
+		return fmt.Errorf("%w: billing_period must be one of month, quarter, year", apperr.ErrInvalidInput)
+	}
+	if !s.Status.Valid() {
+		return fmt.Errorf("%w: unknown status %q", apperr.ErrInvalidInput, s.Status)
+	}
+	if !costRe.MatchString(s.Cost) {
+		return fmt.Errorf("%w: cost must be a non-negative amount with at most 2 decimals, like 1500.00", apperr.ErrInvalidInput)
+	}
+	if !currencyRe.MatchString(s.Currency) {
+		return fmt.Errorf("%w: currency must be a three-letter code, like RUB", apperr.ErrInvalidInput)
+	}
+	if s.EndDate != nil && s.EndDate.Before(s.StartDate) {
+		return fmt.Errorf("%w: end_date must not be before start_date", apperr.ErrInvalidInput)
+	}
+
+	switch s.Type {
+	case domain.SubIndividual:
+		if s.SeatsTotal != nil && *s.SeatsTotal != 1 {
+			return fmt.Errorf("%w: an individual subscription has exactly 1 seat; use type group for more", apperr.ErrInvalidInput)
+		}
+		one := 1
+		s.SeatsTotal = &one
+	case domain.SubGroup:
+		if s.SeatsTotal == nil {
+			return fmt.Errorf("%w: seats_total is required for a group subscription", apperr.ErrInvalidInput)
+		}
+		if *s.SeatsTotal < 1 {
+			return fmt.Errorf("%w: seats_total must be at least 1", apperr.ErrInvalidInput)
+		}
+	case domain.SubEnterprise:
+		if s.SeatsTotal != nil {
+			return fmt.Errorf("%w: an enterprise subscription has no seat limit; omit seats_total", apperr.ErrInvalidInput)
+		}
+	}
+	return nil
+}
+
+// checkRefs returns ErrUnknownCurrency / ErrUnknownDepartment when currency
+// (if not empty) or dept (if set) names nothing. Checking up front, rather
+// than relying on the foreign keys, keeps "no such subscription" and "no such
+// department" apart.
+func (s *Service) checkRefs(ctx context.Context, currency string, dept *int64) error {
+	if currency != "" {
+		ok, err := s.repo.CurrencyExists(ctx, currency)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("%w %s", ErrUnknownCurrency, currency)
+		}
+	}
+	if dept != nil {
+		_, err := s.depts.GetByID(ctx, *dept)
+		if errors.Is(err, storage.ErrNotFound) {
+			return ErrUnknownDepartment
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// mapWriteErr translates the storage errors of Create/Update.
+func mapWriteErr(err error) error {
+	var ce *storage.CheckError
+	if errors.As(err, &ce) && ce.Constraint == "subscriptions_seats_check" {
+		return ErrSeatsBelowUsed
+	}
+	return apperr.MapStorage(err, ErrSubscriptionNotFound)
+}

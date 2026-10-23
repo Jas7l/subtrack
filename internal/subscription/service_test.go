@@ -1,0 +1,318 @@
+package subscription
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"subtrack/internal/apperr"
+	"subtrack/internal/auth"
+	"subtrack/internal/domain"
+	"subtrack/internal/paging"
+)
+
+func TestCreateValidation(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	valid := func() domain.Subscription {
+		return domain.Subscription{
+			Name: " Jira ", Vendor: "Atlassian", Type: domain.SubGroup, Cost: "1500.50", Currency: "rub",
+			BillingPeriod: domain.BillingMonth, StartDate: day("2026-01-01"), SeatsTotal: ptr(10),
+			DepartmentID: ptr(int64(1)),
+		}
+	}
+
+	s, err := f.svc.Create(ctx, f.admin, valid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Name != "Jira" || s.Currency != "RUB" || s.Status != domain.SubActive || s.CreatedBy == nil || *s.CreatedBy != f.admin.ID {
+		t.Errorf("created %+v", s)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*domain.Subscription)
+		want   error
+	}{
+		{"no name", func(s *domain.Subscription) { s.Name = " " }, apperr.ErrInvalidInput},
+		{"no start date", func(s *domain.Subscription) { s.StartDate = day("0001-01-01") }, apperr.ErrInvalidInput},
+		{"bad type", func(s *domain.Subscription) { s.Type = "team" }, apperr.ErrInvalidInput},
+		{"bad period", func(s *domain.Subscription) { s.BillingPeriod = "week" }, apperr.ErrInvalidInput},
+		{"negative cost", func(s *domain.Subscription) { s.Cost = "-1" }, apperr.ErrInvalidInput},
+		{"three decimals", func(s *domain.Subscription) { s.Cost = "1.005" }, apperr.ErrInvalidInput},
+		{"cost too big", func(s *domain.Subscription) { s.Cost = "1234567890123" }, apperr.ErrInvalidInput},
+		{"bad currency", func(s *domain.Subscription) { s.Currency = "RU" }, apperr.ErrInvalidInput},
+		{"unknown currency", func(s *domain.Subscription) { s.Currency = "EUR" }, ErrUnknownCurrency},
+		{"unknown department", func(s *domain.Subscription) { s.DepartmentID = ptr(int64(9)) }, ErrUnknownDepartment},
+		{"ends before start", func(s *domain.Subscription) { s.EndDate = ptr(day("2025-12-31")) }, apperr.ErrInvalidInput},
+		{"group without seats", func(s *domain.Subscription) { s.SeatsTotal = nil }, apperr.ErrInvalidInput},
+		{"group with 0 seats", func(s *domain.Subscription) { s.SeatsTotal = ptr(0) }, apperr.ErrInvalidInput},
+		{"individual with 3 seats", func(s *domain.Subscription) { s.Type = domain.SubIndividual; s.SeatsTotal = ptr(3) }, apperr.ErrInvalidInput},
+		{"enterprise with seats", func(s *domain.Subscription) { s.Type = domain.SubEnterprise }, apperr.ErrInvalidInput},
+	}
+	for _, tt := range tests {
+		in := valid()
+		tt.mutate(&in)
+		if _, err := f.svc.Create(ctx, f.admin, in); !errors.Is(err, tt.want) {
+			t.Errorf("%s: err = %v, want %v", tt.name, err, tt.want)
+		}
+	}
+
+	in := valid()
+	in.Type, in.SeatsTotal = domain.SubIndividual, nil
+	if s, err := f.svc.Create(ctx, f.admin, in); err != nil || s.SeatsTotal == nil || *s.SeatsTotal != 1 {
+		t.Errorf("individual gets 1 seat: %+v, %v", s.SeatsTotal, err)
+	}
+	in.Type = domain.SubEnterprise
+	if s, err := f.svc.Create(ctx, f.admin, in); err != nil || s.SeatsTotal != nil {
+		t.Errorf("enterprise is unlimited: %+v, %v", s.SeatsTotal, err)
+	}
+}
+
+func TestVisibility(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	dev := f.create(t, domain.Subscription{Name: "Jira", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(1))})
+	design := f.create(t, domain.Subscription{Name: "Figma", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(2))})
+	company := f.create(t, domain.Subscription{Name: "Slack", Type: domain.SubEnterprise})
+	if _, err := f.svc.Assign(ctx, f.admin, company.ID, f.emp.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name  string
+		actor domain.User
+		sub   domain.Subscription
+		ok    bool
+	}{
+		{"admin sees any", f.admin, design, true},
+		{"manager sees own department", f.mgr, dev, true},
+		{"manager does not see other department", f.mgr, design, false},
+		{"manager does not see company-wide they do not hold", f.mgr, company, false},
+		{"employee sees what they hold", f.emp, company, true},
+		{"employee does not see own department's", f.emp, dev, false},
+	}
+	for _, tt := range tests {
+		_, err := f.svc.Get(ctx, tt.actor, tt.sub.ID)
+		if tt.ok && err != nil {
+			t.Errorf("%s: err = %v", tt.name, err)
+		}
+		if !tt.ok && !errors.Is(err, ErrSubscriptionNotFound) {
+			t.Errorf("%s: err = %v, want ErrSubscriptionNotFound", tt.name, err)
+		}
+	}
+
+	count := func(actor domain.User, flt domain.SubscriptionFilter) int64 {
+		_, total, err := f.svc.List(ctx, actor, flt, paging.Params{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return total
+	}
+	if n := count(f.admin, domain.SubscriptionFilter{}); n != 3 {
+		t.Errorf("admin: %d, want 3", n)
+	}
+	if n := count(f.mgr, domain.SubscriptionFilter{}); n != 1 {
+		t.Errorf("manager: %d, want 1", n)
+	}
+	if n := count(f.emp, domain.SubscriptionFilter{}); n != 1 {
+		t.Errorf("employee: %d, want 1", n)
+	}
+	if n := count(f.homeless, domain.SubscriptionFilter{}); n != 0 {
+		t.Errorf("nobody's licences: %d, want 0", n)
+	}
+	if n := count(f.admin, domain.SubscriptionFilter{Type: ptr(domain.SubEnterprise)}); n != 1 {
+		t.Errorf("type filter: %d, want 1", n)
+	}
+}
+
+func TestAssignRules(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	dev := f.create(t, domain.Subscription{Name: "Jira", Type: domain.SubGroup, SeatsTotal: ptr(2), DepartmentID: ptr(int64(1))})
+	design := f.create(t, domain.Subscription{Name: "Figma", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(2))})
+	company := f.create(t, domain.Subscription{Name: "Slack", Type: domain.SubEnterprise})
+	closed := f.create(t, domain.Subscription{Name: "Old", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(1))})
+	if _, err := f.svc.Update(ctx, f.admin, closed.ID, domain.SubscriptionPatch{Status: ptr(domain.SubCancelled)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Assign(ctx, f.admin, company.ID, f.mgr.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name      string
+		actor     domain.User
+		sub, user int64
+		want      error
+	}{
+		{"manager: own department", f.mgr, dev.ID, f.emp.ID, nil},
+		{"manager: again", f.mgr, dev.ID, f.emp.ID, ErrAlreadyAssigned},
+		{"manager: person of another department", f.mgr, dev.ID, f.out.ID, ErrInvalidAssignee},
+		{"manager: other department's subscription", f.mgr, design.ID, f.emp.ID, ErrSubscriptionNotFound},
+		{"manager: company-wide they hold", f.mgr, company.ID, f.emp.ID, auth.ErrForbidden},
+		{"admin: across departments", f.admin, design.ID, f.emp.ID, nil},
+		{"admin: blocked user", f.admin, dev.ID, f.blocked.ID, ErrInvalidAssignee},
+		{"admin: missing user", f.admin, dev.ID, 99, ErrInvalidAssignee},
+		{"admin: cancelled subscription", f.admin, closed.ID, f.emp.ID, ErrSubscriptionClosed},
+		{"admin: missing subscription", f.admin, 99, f.emp.ID, ErrSubscriptionNotFound},
+		{"admin: last seat", f.admin, dev.ID, f.emp2.ID, nil},
+		{"admin: no seats left", f.admin, dev.ID, f.mgr.ID, ErrNoFreeSeats},
+		{"employee", f.emp, dev.ID, f.emp2.ID, auth.ErrForbidden},
+	}
+	for _, tt := range tests {
+		_, err := f.svc.Assign(ctx, tt.actor, tt.sub, tt.user)
+		if !errors.Is(err, tt.want) {
+			t.Errorf("%s: err = %v, want %v", tt.name, err, tt.want)
+		}
+	}
+	if s, _ := f.repo.GetByID(ctx, dev.ID); s.SeatsUsed != 2 {
+		t.Errorf("seats_used = %d, want 2", s.SeatsUsed)
+	}
+}
+
+func TestRevoke(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	dev := f.create(t, domain.Subscription{Name: "Jira", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(1))})
+	a1, _ := f.svc.Assign(ctx, f.admin, dev.ID, f.emp.ID)
+	a2, _ := f.svc.Assign(ctx, f.admin, dev.ID, f.emp2.ID)
+	a3, _ := f.svc.Assign(ctx, f.admin, dev.ID, f.out.ID)
+
+	tests := []struct {
+		name  string
+		actor domain.User
+		id    int64
+		want  error
+	}{
+		{"colleague cannot", f.emp2, a1.ID, ErrAssignmentNotFound},
+		{"other department's manager cannot", f.mgrDesign, a1.ID, ErrAssignmentNotFound},
+		{"holder gives it back", f.emp, a1.ID, nil},
+		{"twice", f.admin, a1.ID, ErrAlreadyRevoked},
+		{"manager of the subscription's department", f.mgr, a2.ID, nil},
+		{"admin", f.admin, a3.ID, nil},
+		{"missing", f.admin, 99, ErrAssignmentNotFound},
+	}
+	for _, tt := range tests {
+		_, err := f.svc.Revoke(ctx, tt.actor, tt.id)
+		if !errors.Is(err, tt.want) {
+			t.Errorf("%s: err = %v, want %v", tt.name, err, tt.want)
+		}
+	}
+	if s, _ := f.repo.GetByID(ctx, dev.ID); s.SeatsUsed != 0 {
+		t.Errorf("seats_used = %d, want 0", s.SeatsUsed)
+	}
+	// After giving it back the same person can get it again.
+	if _, err := f.svc.Assign(ctx, f.mgr, dev.ID, f.emp.ID); err != nil {
+		t.Errorf("assign again: %v", err)
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	s := f.create(t, domain.Subscription{Name: "Jira", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(1)),
+		EndDate: ptr(day("2026-12-31"))})
+	for _, u := range []domain.User{f.emp, f.emp2, f.mgr} {
+		if _, err := f.svc.Assign(ctx, f.admin, s.ID, u.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		name  string
+		patch domain.SubscriptionPatch
+		want  error
+	}{
+		{"empty", domain.SubscriptionPatch{}, apperr.ErrInvalidInput},
+		{"scheduler's status", domain.SubscriptionPatch{Status: ptr(domain.SubExpired)}, apperr.ErrInvalidInput},
+		{"seats below used", domain.SubscriptionPatch{SeatsTotal: ptr(2)}, ErrSeatsBelowUsed},
+		{"to individual with 3 in use", domain.SubscriptionPatch{Type: ptr(domain.SubIndividual)}, ErrSeatsBelowUsed},
+		{"to group from group keeps seats", domain.SubscriptionPatch{Type: ptr(domain.SubGroup)}, nil},
+		{"start after end", domain.SubscriptionPatch{StartDate: ptr(day("2027-01-01"))}, apperr.ErrInvalidInput},
+		{"unknown currency", domain.SubscriptionPatch{Currency: ptr("EUR")}, ErrUnknownCurrency},
+		{"unknown department", domain.SubscriptionPatch{DepartmentID: domain.IDPatch{Set: true, Value: ptr(int64(9))}}, ErrUnknownDepartment},
+		{"seats down to used", domain.SubscriptionPatch{SeatsTotal: ptr(3)}, nil},
+		{"clear end date", domain.SubscriptionPatch{EndDate: domain.DatePatch{Set: true}}, nil},
+	}
+	for _, tt := range tests {
+		if _, err := f.svc.Update(ctx, f.admin, s.ID, tt.patch); !errors.Is(err, tt.want) {
+			t.Errorf("%s: err = %v, want %v", tt.name, err, tt.want)
+		}
+	}
+
+	got, _ := f.repo.GetByID(ctx, s.ID)
+	if got.EndDate != nil || *got.SeatsTotal != 3 {
+		t.Errorf("after updates: end %v, seats %d", got.EndDate, *got.SeatsTotal)
+	}
+
+	// Switching to enterprise drops the limit; back to group needs seats.
+	if u, err := f.svc.Update(ctx, f.admin, s.ID, domain.SubscriptionPatch{Type: ptr(domain.SubEnterprise)}); err != nil || u.SeatsTotal != nil {
+		t.Errorf("to enterprise: %+v, %v", u.SeatsTotal, err)
+	}
+	if _, err := f.svc.Update(ctx, f.admin, s.ID, domain.SubscriptionPatch{Type: ptr(domain.SubGroup)}); !errors.Is(err, apperr.ErrInvalidInput) {
+		t.Errorf("to group without seats: err = %v", err)
+	}
+
+	// Cancelling revokes everything.
+	u, err := f.svc.Update(ctx, f.admin, s.ID, domain.SubscriptionPatch{Status: ptr(domain.SubCancelled)})
+	if err != nil || u.SeatsUsed != 0 {
+		t.Fatalf("cancel: seats_used %d, %v", u.SeatsUsed, err)
+	}
+	active := domain.AssignmentActive
+	if _, n, _ := f.svc.ListAssignments(ctx, f.admin, domain.AssignmentFilter{Status: &active}, paging.Params{}); n != 0 {
+		t.Errorf("active licences after cancel: %d", n)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	s := f.create(t, domain.Subscription{Name: "Jira", Type: domain.SubGroup, SeatsTotal: ptr(5)})
+	a, _ := f.svc.Assign(ctx, f.admin, s.ID, f.emp.ID)
+
+	if err := f.svc.Delete(ctx, f.admin, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.Delete(ctx, f.admin, s.ID); !errors.Is(err, ErrSubscriptionNotFound) {
+		t.Errorf("twice: err = %v", err)
+	}
+	if _, err := f.svc.Get(ctx, f.admin, s.ID); !errors.Is(err, ErrSubscriptionNotFound) {
+		t.Errorf("get deleted: err = %v", err)
+	}
+	// The licence stays as revoked history, still visible to its holder.
+	got, err := f.svc.GetAssignment(ctx, f.emp, a.ID)
+	if err != nil || got.Status != domain.AssignmentRevoked {
+		t.Errorf("licence after delete: %+v, %v", got, err)
+	}
+}
+
+func TestListAssignmentsScope(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	dev := f.create(t, domain.Subscription{Name: "Jira", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(1))})
+	company := f.create(t, domain.Subscription{Name: "Slack", Type: domain.SubEnterprise})
+	for _, x := range []struct{ sub, user int64 }{{dev.ID, f.emp.ID}, {dev.ID, f.out.ID}, {company.ID, f.emp.ID}, {company.ID, f.mgr.ID}, {company.ID, f.out.ID}} {
+		if _, err := f.svc.Assign(ctx, f.admin, x.sub, x.user); err != nil {
+			t.Fatal(err)
+		}
+	}
+	count := func(actor domain.User) int64 {
+		_, n, err := f.svc.ListAssignments(ctx, actor, domain.AssignmentFilter{}, paging.Params{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if n := count(f.admin); n != 5 {
+		t.Errorf("admin: %d, want 5", n)
+	}
+	// dev's two licences plus the manager's own Slack.
+	if n := count(f.mgr); n != 3 {
+		t.Errorf("manager: %d, want 3", n)
+	}
+	if n := count(f.emp); n != 2 {
+		t.Errorf("employee: %d, want 2", n)
+	}
+}

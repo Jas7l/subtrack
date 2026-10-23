@@ -42,3 +42,16 @@ func (e *ConstraintError) Error() string {
 func (e *ConstraintError) Is(target error) bool {
 	return target == ErrAlreadyExists
 }
+
+// CheckError is a CHECK constraint violation (SQLSTATE 23514): the write
+// would leave a row breaking a rule the schema enforces, such as
+// "seats_used <= seats_total". Constraint names the rule so a service can turn
+// it into a meaningful error; one it does not recognise is a bug and ends up
+// as a 500.
+type CheckError struct {
+	Constraint string
+}
+
+func (e *CheckError) Error() string {
+	return "storage: check constraint violated: " + e.Constraint
+}
