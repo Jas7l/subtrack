@@ -17,6 +17,8 @@ import (
 	"subtrack/internal/auth"
 	"subtrack/internal/department"
 	"subtrack/internal/httpx"
+	"subtrack/internal/pg"
+	"subtrack/internal/request"
 	"subtrack/internal/subscription"
 	"subtrack/internal/user"
 )
@@ -54,6 +56,8 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	auth.RegisterRoutes(api, protected, authSvc)
 	user.RegisterRoutes(protected, user.New(users, depts))
 	department.RegisterRoutes(protected, department.New(depts, users))
-	subscription.RegisterRoutes(protected, subscription.New(subscription.NewStore(pool), users, depts))
+	subs := subscription.New(subscription.NewStore(pool), users, depts)
+	subscription.RegisterRoutes(protected, subs)
+	request.RegisterRoutes(protected, request.New(request.NewStore(pool), depts, subs, pg.NewTxRunner(pool)))
 	return nil
 }

@@ -45,16 +45,15 @@ func RegisterRoutes(protected *mux.Router, svc *Service) {
 // writeErr maps subscription service errors onto HTTP statuses. Anything
 // unrecognised is a 500.
 func writeErr(ctx context.Context, w http.ResponseWriter, err error) {
+	// Every sentinel of this package carries its apperr kind.
 	switch {
-	case errors.Is(err, apperr.ErrInvalidInput), errors.Is(err, ErrUnknownDepartment),
-		errors.Is(err, ErrUnknownCurrency), errors.Is(err, ErrInvalidAssignee):
+	case errors.Is(err, apperr.ErrInvalidInput):
 		httpx.Error(ctx, w, http.StatusBadRequest, err)
 	case errors.Is(err, auth.ErrForbidden):
 		httpx.Error(ctx, w, http.StatusForbidden, err)
-	case errors.Is(err, ErrSubscriptionNotFound), errors.Is(err, ErrAssignmentNotFound):
+	case errors.Is(err, apperr.ErrNotFound):
 		httpx.Error(ctx, w, http.StatusNotFound, err)
-	case errors.Is(err, ErrSeatsBelowUsed), errors.Is(err, ErrSubscriptionClosed), errors.Is(err, ErrAlreadyAssigned),
-		errors.Is(err, ErrNoFreeSeats), errors.Is(err, ErrAlreadyRevoked), errors.Is(err, apperr.ErrConflict):
+	case errors.Is(err, apperr.ErrConflict):
 		httpx.Error(ctx, w, http.StatusConflict, err)
 	default:
 		httpx.Internal(ctx, w, err)

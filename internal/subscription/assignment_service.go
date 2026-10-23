@@ -15,27 +15,27 @@ import (
 var (
 	// ErrAssignmentNotFound is returned when the assignment does not exist or
 	// is outside the caller's view. Mapped to 404.
-	ErrAssignmentNotFound = errors.New("service: assignment not found")
+	ErrAssignmentNotFound = apperr.New(apperr.ErrNotFound, "service: assignment not found")
 
 	// ErrInvalidAssignee is returned when the user to get a licence does not
 	// exist, is blocked, or (for a manager) is not in the manager's
 	// department. Mapped to 400.
-	ErrInvalidAssignee = errors.New("service: invalid input: the licence can go only to an active user (a manager: of their own department)")
+	ErrInvalidAssignee = apperr.New(apperr.ErrInvalidInput, "service: invalid input: the licence can go only to an active user (a manager: of their own department)")
 
 	// ErrSubscriptionClosed is returned when licences of a cancelled or
 	// expired subscription are handed out. Mapped to 409.
-	ErrSubscriptionClosed = errors.New("service: the subscription is cancelled or expired")
+	ErrSubscriptionClosed = apperr.New(apperr.ErrConflict, "service: the subscription is cancelled or expired")
 
 	// ErrAlreadyAssigned is returned when the user already holds a licence of
 	// the subscription. Mapped to 409.
-	ErrAlreadyAssigned = errors.New("service: the user already holds a licence of this subscription")
+	ErrAlreadyAssigned = apperr.New(apperr.ErrConflict, "service: the user already holds a licence of this subscription")
 
 	// ErrNoFreeSeats is returned when every seat is taken. Mapped to 409.
-	ErrNoFreeSeats = errors.New("service: no free seats left")
+	ErrNoFreeSeats = apperr.New(apperr.ErrConflict, "service: no free seats left")
 
 	// ErrAlreadyRevoked is returned when the licence was revoked before.
 	// Mapped to 409.
-	ErrAlreadyRevoked = errors.New("service: the licence is already revoked")
+	ErrAlreadyRevoked = apperr.New(apperr.ErrConflict, "service: the licence is already revoked")
 )
 
 // GetAssignment returns one assignment as actor is allowed to see it: the

@@ -13,7 +13,9 @@ import (
 )
 
 // Store reads and writes subtrack.subscriptions and
-// subtrack.subscription_assignments. The pool is borrowed, not owned.
+// subtrack.subscription_assignments. The pool is borrowed, not owned. Every
+// method runs on pg.Conn(ctx, pool), so it joins a transaction started by
+// pg.TxRunner (its own transactions become savepoints).
 //
 // Lock order. Every write that touches more than one of these rows takes the
 // locks in the same order - user, then subscription, then assignments - so
@@ -66,7 +68,7 @@ func getSubscription(ctx context.Context, q queryRower, id int64) (domain.Subscr
 //   - storage.ErrNotFound when no live row has that id.
 //   - any other db error wrapped as "postgres: get subscription: ...".
 func (s *Store) GetByID(ctx context.Context, id int64) (domain.Subscription, error) {
-	sub, err := getSubscription(ctx, s.pool, id)
+	sub, err := getSubscription(ctx, pg.Conn(ctx, s.pool), id)
 	if err != nil {
 		return domain.Subscription{}, pg.Translate(ctx, "get subscription", err)
 	}
@@ -155,14 +157,14 @@ func (s *Store) List(ctx context.Context, f domain.SubscriptionFilter, sc *domai
 	where := b.sql()
 
 	var total int64
-	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM subtrack.subscriptions s`+where, b.args...).Scan(&total); err != nil {
+	if err := pg.Conn(ctx, s.pool).QueryRow(ctx, `SELECT COUNT(*) FROM subtrack.subscriptions s`+where, b.args...).Scan(&total); err != nil {
 		return nil, 0, pg.Translate(ctx, "count subscriptions", err)
 	}
 
 	args := append(b.args, limit, offset)
 	q := selectSubscription + where +
 		` ORDER BY s.name, s.id LIMIT $` + pg.Itoa(len(args)-1) + ` OFFSET $` + pg.Itoa(len(args))
-	rows, err := s.pool.Query(ctx, q, args...)
+	rows, err := pg.Conn(ctx, s.pool).Query(ctx, q, args...)
 	if err != nil {
 		return nil, 0, pg.Translate(ctx, "list subscriptions", err)
 	}
@@ -185,7 +187,7 @@ func (s *Store) List(ctx context.Context, f domain.SubscriptionFilter, sc *domai
 // CurrencyExists reports whether code is a known currency.
 func (s *Store) CurrencyExists(ctx context.Context, code string) (bool, error) {
 	var ok bool
-	err := s.pool.QueryRow(ctx,
+	err := pg.Conn(ctx, s.pool).QueryRow(ctx,
 		`SELECT EXISTS (SELECT 1 FROM subtrack.currencies WHERE code = $1)`, code).Scan(&ok)
 	if err != nil {
 		return false, pg.Translate(ctx, "currency exists", err)
@@ -203,7 +205,7 @@ func (s *Store) CurrencyExists(ctx context.Context, code string) (bool, error) {
 //   - any other db error wrapped as "postgres: create subscription: ...".
 func (s *Store) Create(ctx context.Context, sub domain.Subscription) (domain.Subscription, error) {
 	var id int64
-	err := s.pool.QueryRow(ctx, `
+	err := pg.Conn(ctx, s.pool).QueryRow(ctx, `
 		INSERT INTO subtrack.subscriptions (name, vendor, category, type, cost, currency, billing_period,
 		    start_date, end_date, next_payment_date, status, department_id, seats_total, created_by)
 		VALUES ($1, $2, $3, $4, CAST($5::text AS NUMERIC), $6, $7, $8, $9, $10, $11, $12, $13, $14)
@@ -230,7 +232,7 @@ func (s *Store) Create(ctx context.Context, sub domain.Subscription) (domain.Sub
 //     exist.
 //   - any other db error wrapped as "postgres: update subscription: ...".
 func (s *Store) Update(ctx context.Context, sub domain.Subscription, actorID int64) (domain.Subscription, error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
 		return domain.Subscription{}, pg.Translate(ctx, "begin update subscription", err)
 	}
@@ -275,7 +277,7 @@ func (s *Store) Update(ctx context.Context, sub domain.Subscription, actorID int
 //   - storage.ErrNotFound when no live row has that id.
 //   - any other db error wrapped as "postgres: delete subscription: ...".
 func (s *Store) Delete(ctx context.Context, id, actorID int64) error {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
 		return pg.Translate(ctx, "begin delete subscription", err)
 	}

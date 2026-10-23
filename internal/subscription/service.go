@@ -35,19 +35,19 @@ import (
 var (
 	// ErrSubscriptionNotFound is returned when the subscription does not
 	// exist, is deleted, or is outside the caller's view. Mapped to 404.
-	ErrSubscriptionNotFound = errors.New("service: subscription not found")
+	ErrSubscriptionNotFound = apperr.New(apperr.ErrNotFound, "service: subscription not found")
 
 	// ErrUnknownDepartment is returned when department_id names no
 	// department. Mapped to 400.
-	ErrUnknownDepartment = errors.New("service: invalid input: department does not exist")
+	ErrUnknownDepartment = apperr.New(apperr.ErrInvalidInput, "service: invalid input: department does not exist")
 
 	// ErrUnknownCurrency is returned when the currency is not in the
 	// currencies table. Mapped to 400.
-	ErrUnknownCurrency = errors.New("service: invalid input: unknown currency")
+	ErrUnknownCurrency = apperr.New(apperr.ErrInvalidInput, "service: invalid input: unknown currency")
 
 	// ErrSeatsBelowUsed is returned when an edit would leave fewer seats than
 	// licences in use. Mapped to 409.
-	ErrSeatsBelowUsed = errors.New("service: seats_total cannot be lower than the number of seats in use; revoke licences first")
+	ErrSeatsBelowUsed = apperr.New(apperr.ErrConflict, "service: seats_total cannot be lower than the number of seats in use; revoke licences first")
 )
 
 // repo is the slice of persistence the service needs; *Store satisfies it.

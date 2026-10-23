@@ -47,7 +47,7 @@ func getAssignment(ctx context.Context, q queryRower, id int64) (domain.Assignme
 //   - storage.ErrNotFound when no row has that id.
 //   - any other db error wrapped as "postgres: get assignment: ...".
 func (s *Store) GetAssignment(ctx context.Context, id int64) (domain.Assignment, error) {
-	a, err := getAssignment(ctx, s.pool, id)
+	a, err := getAssignment(ctx, pg.Conn(ctx, s.pool), id)
 	if err != nil {
 		return domain.Assignment{}, pg.Translate(ctx, "get assignment", err)
 	}
@@ -58,7 +58,7 @@ func (s *Store) GetAssignment(ctx context.Context, id int64) (domain.Assignment,
 // subID.
 func (s *Store) HasActiveAssignment(ctx context.Context, subID, userID int64) (bool, error) {
 	var ok bool
-	err := s.pool.QueryRow(ctx, `
+	err := pg.Conn(ctx, s.pool).QueryRow(ctx, `
 		SELECT EXISTS (SELECT 1 FROM subtrack.subscription_assignments
 		               WHERE subscription_id = $1 AND user_id = $2 AND status = 'active')`,
 		subID, userID).Scan(&ok)
@@ -89,7 +89,7 @@ func (s *Store) ListAssignments(ctx context.Context, f domain.AssignmentFilter, 
 	where := b.sql()
 
 	var total int64
-	err := s.pool.QueryRow(ctx, `
+	err := pg.Conn(ctx, s.pool).QueryRow(ctx, `
 		SELECT COUNT(*) FROM subtrack.subscription_assignments a
 		JOIN subtrack.subscriptions s ON s.id = a.subscription_id`+where, b.args...).Scan(&total)
 	if err != nil {
@@ -99,7 +99,7 @@ func (s *Store) ListAssignments(ctx context.Context, f domain.AssignmentFilter, 
 	args := append(b.args, limit, offset)
 	q := selectAssignment + where +
 		` ORDER BY a.assigned_at DESC, a.id DESC LIMIT $` + pg.Itoa(len(args)-1) + ` OFFSET $` + pg.Itoa(len(args))
-	rows, err := s.pool.Query(ctx, q, args...)
+	rows, err := pg.Conn(ctx, s.pool).Query(ctx, q, args...)
 	if err != nil {
 		return nil, 0, pg.Translate(ctx, "list assignments", err)
 	}
@@ -130,7 +130,7 @@ func (s *Store) ListAssignments(ctx context.Context, f domain.AssignmentFilter, 
 //     the user already holds a licence of it.
 //   - any other db error wrapped as "postgres: assign ...".
 func (s *Store) Assign(ctx context.Context, subID, userID, actorID int64) (domain.Assignment, error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
 		return domain.Assignment{}, pg.Translate(ctx, "begin assign", err)
 	}
@@ -183,7 +183,7 @@ func (s *Store) Assign(ctx context.Context, subID, userID, actorID int64) (domai
 //     exist or was revoked meanwhile).
 //   - any other db error wrapped as "postgres: revoke ...".
 func (s *Store) Revoke(ctx context.Context, id, actorID int64) (domain.Assignment, error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
 		return domain.Assignment{}, pg.Translate(ctx, "begin revoke", err)
 	}
