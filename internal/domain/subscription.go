@@ -42,6 +42,27 @@ func (p BillingPeriod) Valid() bool {
 	return false
 }
 
+// Months is how many months the period lasts: 1, 3 or 12.
+func (p BillingPeriod) Months() int {
+	switch p {
+	case BillingQuarter:
+		return 3
+	case BillingYear:
+		return 12
+	}
+	return 1
+}
+
+// Next is the payment day one period after d (a calendar day at midnight
+// UTC). Past the end of a shorter month the day is clamped, and stays so:
+// 31.01 → 28.02 → 28.03.
+func (p BillingPeriod) Next(d time.Time) time.Time {
+	y, m, day := d.Date()
+	first := time.Date(y, m+time.Month(p.Months()), 1, 0, 0, 0, 0, time.UTC)
+	last := first.AddDate(0, 1, -1).Day()
+	return time.Date(first.Year(), first.Month(), min(day, last), 0, 0, 0, 0, time.UTC)
+}
+
 // SubscriptionStatus is where a subscription is in its life. active and
 // cancelled are set by people; expiring_soon and expired are set by the
 // scheduler from end_date.

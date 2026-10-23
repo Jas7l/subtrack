@@ -10,10 +10,12 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"subtrack/internal/analytics"
 	"subtrack/internal/audit"
 	"subtrack/internal/auth"
 	"subtrack/internal/department"
@@ -39,7 +41,10 @@ import (
 //
 // Mount also creates the bootstrap admin when the database has none (see
 // auth.Service.EnsureAdmin); an error from that stops startup.
-func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.Config) error {
+//
+// loc is the company's time zone (SCHEDULER_TZ): it decides what "today" and
+// "this month" are in the reports, as it does for the scheduler.
+func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.Config, loc *time.Location) error {
 	r.NotFoundHandler = http.HandlerFunc(httpx.RouteNotFound)
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.NotFoundHandler = r.NotFoundHandler
@@ -74,6 +79,7 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	audit.RegisterRoutes(protected, audit.New(trail))
 	settings.RegisterRoutes(protected, settings.New(settings.NewStore(pool), tx, trail))
 	transaction.RegisterRoutes(protected, transaction.New(transaction.NewStore(pool), subStore, tx, trail))
+	analytics.RegisterRoutes(protected, analytics.New(analytics.NewStore(pool), loc))
 	return nil
 }
 

@@ -97,7 +97,7 @@ func run() error {
 		httpx.WriteOK(r.Context(), w, map[string]string{"status": "ok", "version": Version})
 	}).Methods("GET")
 
-	if err := server.Mount(ctx, r, pool, cfg.Auth); err != nil {
+	if err := server.Mount(ctx, r, pool, cfg.Auth, cfg.Scheduler.Location); err != nil {
 		return err
 	}
 

@@ -173,27 +173,6 @@ func TestPlanChargeCap(t *testing.T) {
 	}
 }
 
-func TestNextPayment(t *testing.T) {
-	cases := []struct {
-		from   string
-		period domain.BillingPeriod
-		want   string
-	}{
-		{"2026-10-23", domain.BillingMonth, "2026-11-23"},
-		{"2026-12-15", domain.BillingMonth, "2027-01-15"},
-		{"2026-01-31", domain.BillingMonth, "2026-02-28"},
-		{"2028-01-31", domain.BillingMonth, "2028-02-29"},
-		{"2026-11-30", domain.BillingQuarter, "2027-02-28"},
-		{"2026-10-23", domain.BillingQuarter, "2027-01-23"},
-		{"2028-02-29", domain.BillingYear, "2029-02-28"},
-	}
-	for _, c := range cases {
-		if got := nextPayment(day(c.from), c.period).Format(time.DateOnly); got != c.want {
-			t.Errorf("nextPayment(%s, %s) = %s, want %s", c.from, c.period, got, c.want)
-		}
-	}
-}
-
 func TestDayIn(t *testing.T) {
 	msk, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {

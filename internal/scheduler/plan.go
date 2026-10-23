@@ -72,7 +72,7 @@ func plan(sub domain.Subscription, today time.Time, st domain.NotificationSettin
 		e := event{kind: evCharge, next: *pay}
 		for !e.next.After(today) && (end == nil || !e.next.After(*end)) && len(e.charge) < maxChargesPerRun {
 			e.charge = append(e.charge, e.next)
-			e.next = nextPayment(e.next, sub.BillingPeriod)
+			e.next = sub.BillingPeriod.Next(e.next)
 		}
 		if len(e.charge) > 0 {
 			out = append(out, e)
@@ -102,22 +102,6 @@ func plan(sub domain.Subscription, today time.Time, st domain.NotificationSettin
 		}
 	}
 	return out
-}
-
-// nextPayment is the payment date one billing period after d. Past the end
-// of a shorter month the day is clamped: 31.01 → 28.02 → 28.03.
-func nextPayment(d time.Time, p domain.BillingPeriod) time.Time {
-	months := 1
-	switch p {
-	case domain.BillingQuarter:
-		months = 3
-	case domain.BillingYear:
-		months = 12
-	}
-	y, m, day := d.Date()
-	first := time.Date(y, m+time.Month(months), 1, 0, 0, 0, 0, time.UTC)
-	last := first.AddDate(0, 1, -1).Day()
-	return time.Date(first.Year(), first.Month(), min(day, last), 0, 0, 0, 0, time.UTC)
 }
 
 // eventKey builds a notification_log key such as "sub_5_expiring_2026-10-30".
