@@ -140,7 +140,8 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		writeErr(r.Context(), w, err)
 		return
 	}
-	d, err := h.svc.Create(r.Context(), CreateDepartmentInput{Name: req.Name, HeadID: req.HeadID})
+	actor, _ := auth.UserFromContext(r.Context())
+	d, err := h.svc.Create(r.Context(), actor, CreateDepartmentInput{Name: req.Name, HeadID: req.HeadID})
 	if err != nil {
 		writeErr(r.Context(), w, err)
 		return
@@ -177,7 +178,8 @@ func (h *handler) update(w http.ResponseWriter, r *http.Request) {
 		writeErr(r.Context(), w, err)
 		return
 	}
-	d, err := h.svc.Update(r.Context(), id, domain.DepartmentPatch{
+	actor, _ := auth.UserFromContext(r.Context())
+	d, err := h.svc.Update(r.Context(), actor, id, domain.DepartmentPatch{
 		Name:   req.Name,
 		HeadID: domain.IDPatch(req.HeadID),
 	})
@@ -209,7 +211,8 @@ func (h *handler) delete(w http.ResponseWriter, r *http.Request) {
 		writeErr(r.Context(), w, err)
 		return
 	}
-	if err := h.svc.Delete(r.Context(), id); err != nil {
+	actor, _ := auth.UserFromContext(r.Context())
+	if err := h.svc.Delete(r.Context(), actor, id); err != nil {
 		writeErr(r.Context(), w, err)
 		return
 	}

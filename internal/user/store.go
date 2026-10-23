@@ -17,6 +17,8 @@ import (
 const userColumns = `id, full_name, email, password_hash, role, department_id, is_active, created_at, updated_at`
 
 // Store reads and writes subtrack.users. The pool is borrowed, not owned.
+// Every method runs on pg.Conn(ctx, pool), so it joins a transaction started
+// by pg.TxRunner (its own transactions become savepoints).
 type Store struct {
 	pool *pgxpool.Pool
 }
@@ -42,7 +44,7 @@ func scanUser(row pgx.Row) (domain.User, error) {
 //   - storage.ErrNotFound when no row has that id.
 //   - any other db error wrapped as "postgres: get user by id: ...".
 func (s *Store) GetByID(ctx context.Context, id int64) (domain.User, error) {
-	u, err := scanUser(s.pool.QueryRow(ctx,
+	u, err := scanUser(pg.Conn(ctx, s.pool).QueryRow(ctx,
 		`SELECT `+userColumns+` FROM subtrack.users WHERE id = $1`, id))
 	if err != nil {
 		return domain.User{}, pg.Translate(ctx, "get user by id", err)
@@ -57,7 +59,7 @@ func (s *Store) GetByID(ctx context.Context, id int64) (domain.User, error) {
 //   - storage.ErrNotFound when no row has that email.
 //   - any other db error wrapped as "postgres: get user by email: ...".
 func (s *Store) GetByEmail(ctx context.Context, email string) (domain.User, error) {
-	u, err := scanUser(s.pool.QueryRow(ctx,
+	u, err := scanUser(pg.Conn(ctx, s.pool).QueryRow(ctx,
 		`SELECT `+userColumns+` FROM subtrack.users WHERE lower(email) = lower($1)`, email))
 	if err != nil {
 		return domain.User{}, pg.Translate(ctx, "get user by email", err)
@@ -69,7 +71,7 @@ func (s *Store) GetByEmail(ctx context.Context, email string) (domain.User, erro
 // uses it to decide whether the bootstrap admin must be created.
 func (s *Store) HasActiveAdmin(ctx context.Context) (bool, error) {
 	var ok bool
-	err := s.pool.QueryRow(ctx,
+	err := pg.Conn(ctx, s.pool).QueryRow(ctx,
 		`SELECT EXISTS (SELECT 1 FROM subtrack.users WHERE role = 'admin' AND is_active)`).Scan(&ok)
 	if err != nil {
 		return false, pg.Translate(ctx, "has active admin", err)
@@ -86,7 +88,7 @@ func (s *Store) HasActiveAdmin(ctx context.Context) (bool, error) {
 //   - wrapped storage.ErrNotFound when DepartmentID names no department.
 //   - any other db error wrapped as "postgres: create user: ...".
 func (s *Store) Create(ctx context.Context, u domain.User) (domain.User, error) {
-	out, err := scanUser(s.pool.QueryRow(ctx,
+	out, err := scanUser(pg.Conn(ctx, s.pool).QueryRow(ctx,
 		`INSERT INTO subtrack.users (full_name, email, password_hash, role, department_id, is_active)
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING `+userColumns,
@@ -103,7 +105,7 @@ func (s *Store) Create(ctx context.Context, u domain.User) (domain.User, error) 
 //   - storage.ErrNotFound when no row has that id.
 //   - any other db error wrapped as "postgres: set password hash: ...".
 func (s *Store) SetPasswordHash(ctx context.Context, id int64, hash string) error {
-	tag, err := s.pool.Exec(ctx,
+	tag, err := pg.Conn(ctx, s.pool).Exec(ctx,
 		`UPDATE subtrack.users SET password_hash = $2, updated_at = NOW() WHERE id = $1`, id, hash)
 	if err != nil {
 		return pg.Translate(ctx, "set password hash", err)
@@ -144,14 +146,14 @@ func (s *Store) List(ctx context.Context, f domain.UserFilter, limit, offset int
 	}
 
 	var total int64
-	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM subtrack.users`+where, args...).Scan(&total); err != nil {
+	if err := pg.Conn(ctx, s.pool).QueryRow(ctx, `SELECT COUNT(*) FROM subtrack.users`+where, args...).Scan(&total); err != nil {
 		return nil, 0, pg.Translate(ctx, "count users", err)
 	}
 
 	args = append(args, limit, offset)
 	q := `SELECT ` + userColumns + ` FROM subtrack.users` + where +
 		` ORDER BY full_name, id LIMIT $` + pg.Itoa(len(args)-1) + ` OFFSET $` + pg.Itoa(len(args))
-	rows, err := s.pool.Query(ctx, q, args...)
+	rows, err := pg.Conn(ctx, s.pool).Query(ctx, q, args...)
 	if err != nil {
 		return nil, 0, pg.Translate(ctx, "list users", err)
 	}
@@ -214,7 +216,7 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorI
 	q := `UPDATE subtrack.users SET ` + strings.Join(sets, ", ") +
 		` WHERE id = $` + pg.Itoa(len(args)) + ` RETURNING ` + userColumns
 
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
 		return domain.User{}, pg.Translate(ctx, "begin update user", err)
 	}

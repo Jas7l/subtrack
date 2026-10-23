@@ -57,15 +57,30 @@ type users interface {
 	GetByID(ctx context.Context, id int64) (domain.User, error)
 }
 
-// Service implements the departments use cases.
+// transactor runs fn in one transaction; *pg.TxRunner satisfies it.
+type transactor interface {
+	InTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// auditor records a change in the audit trail; *audit.Store satisfies it.
+// It is called inside the change's transaction.
+type auditor interface {
+	Record(ctx context.Context, e domain.AuditEntry) error
+}
+
+// Service implements the departments use cases. Every write runs in a
+// transaction together with its audit record.
 type Service struct {
 	repo  repo
 	users users
+	tx    transactor
+	audit auditor
 }
 
-// New wires a Service over the departments repo and the users reader.
-func New(r repo, u users) *Service {
-	return &Service{repo: r, users: u}
+// New wires a Service over the departments repo, the users reader, the
+// transaction runner and the audit trail.
+func New(r repo, u users, tx transactor, a auditor) *Service {
+	return &Service{repo: r, users: u, tx: tx, audit: a}
 }
 
 // CreateDepartmentInput carries the fields of a new department.
@@ -127,7 +142,7 @@ func (s *Service) List(ctx context.Context, actor domain.User, query string, p p
 //   - apperr.ErrInvalidInput when the name is empty.
 //   - ErrInvalidHead, ErrHeadTaken, ErrNameTaken as their names say.
 //   - any other datastore failure, propagated.
-func (s *Service) Create(ctx context.Context, in CreateDepartmentInput) (domain.Department, error) {
+func (s *Service) Create(ctx context.Context, actor domain.User, in CreateDepartmentInput) (domain.Department, error) {
 	log := logger.Op(ctx, "department.Service.Create")
 	in.Name = strings.TrimSpace(in.Name)
 	log.Debug("start", "name", in.Name)
@@ -138,11 +153,20 @@ func (s *Service) Create(ctx context.Context, in CreateDepartmentInput) (domain.
 	if err := s.checkHead(ctx, in.HeadID); err != nil {
 		return domain.Department{}, err
 	}
-	d, err := s.repo.Create(ctx, domain.Department{Name: in.Name, HeadID: in.HeadID})
+	var d domain.Department
+	err := s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		d, err = s.repo.Create(ctx, domain.Department{Name: in.Name, HeadID: in.HeadID})
+		if err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "department.create", "department", d.ID,
+			map[string]any{"name": d.Name, "head_id": d.HeadID}))
+	})
 	if err != nil {
 		return domain.Department{}, mapWriteErr(err)
 	}
-	log.Info("department created", "id", d.ID, "head_id", d.HeadID)
+	log.Info("department created", "id", d.ID, "head_id", logger.Val(d.HeadID))
 	return d, nil
 }
 
@@ -153,7 +177,7 @@ func (s *Service) Create(ctx context.Context, in CreateDepartmentInput) (domain.
 //   - apperr.ErrInvalidInput for an empty patch or an empty name.
 //   - ErrDepartmentNotFound, ErrInvalidHead, ErrHeadTaken, ErrNameTaken.
 //   - any other datastore failure, propagated.
-func (s *Service) Update(ctx context.Context, id int64, p domain.DepartmentPatch) (domain.Department, error) {
+func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p domain.DepartmentPatch) (domain.Department, error) {
 	log := logger.Op(ctx, "department.Service.Update")
 	log.Debug("start", "id", id)
 
@@ -172,11 +196,26 @@ func (s *Service) Update(ctx context.Context, id int64, p domain.DepartmentPatch
 			return domain.Department{}, err
 		}
 	}
-	d, err := s.repo.Update(ctx, id, p)
+	details := map[string]any{}
+	if p.Name != nil {
+		details["name"] = *p.Name
+	}
+	if p.HeadID.Set {
+		details["head_id"] = p.HeadID.Value
+	}
+	var d domain.Department
+	err := s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		d, err = s.repo.Update(ctx, id, p)
+		if err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "department.update", "department", id, details))
+	})
 	if err != nil {
 		return domain.Department{}, mapWriteErr(err)
 	}
-	log.Info("department updated", "id", d.ID, "head_id", d.HeadID)
+	log.Info("department updated", "id", d.ID, "head_id", logger.Val(d.HeadID))
 	return d, nil
 }
 
@@ -187,9 +226,22 @@ func (s *Service) Update(ctx context.Context, id int64, p domain.DepartmentPatch
 //   - ErrDepartmentNotEmpty (wrapped, with the counts) while it still has
 //     active people or live subscriptions.
 //   - any other datastore failure, propagated.
-func (s *Service) Delete(ctx context.Context, id int64) error {
+func (s *Service) Delete(ctx context.Context, actor domain.User, id int64) error {
 	log := logger.Op(ctx, "department.Service.Delete")
-	users, subs, err := s.repo.Delete(ctx, id)
+	var users, subs int64
+	err := s.tx.InTx(ctx, func(ctx context.Context) error {
+		// Read the name first: the record outlives the row.
+		d, err := s.repo.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		users, subs, err = s.repo.Delete(ctx, id)
+		if err != nil || users > 0 || subs > 0 {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "department.delete", "department", id,
+			map[string]any{"name": d.Name}))
+	})
 	if err != nil {
 		return apperr.MapStorage(err, ErrDepartmentNotFound)
 	}

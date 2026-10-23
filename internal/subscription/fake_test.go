@@ -9,6 +9,7 @@ import (
 
 	"subtrack/internal/domain"
 	"subtrack/internal/storage"
+	"subtrack/internal/testkit"
 )
 
 // fakeRepo is an in-memory subscriptions + assignments store with the rules
@@ -267,6 +268,7 @@ func day(s string) time.Time {
 // with two of their people; a design employee; a blocked dev employee.
 type fixture struct {
 	repo                         *fakeRepo
+	audit                        *testkit.Audit
 	svc                          *Service
 	admin, mgr, emp, emp2, out   domain.User
 	blocked, mgrDesign, homeless domain.User
@@ -292,7 +294,8 @@ func newFixture(t *testing.T) fixture {
 		homeless:  add(8, domain.RoleEmployee, nil, true),
 	}
 	f.repo = newFakeRepo(users)
-	f.svc = New(f.repo, users, fakeDepts{dev: true, design: true})
+	f.audit = &testkit.Audit{}
+	f.svc = New(f.repo, users, fakeDepts{dev: true, design: true}, &testkit.Tx{}, f.audit)
 	return f
 }
 

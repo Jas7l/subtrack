@@ -270,3 +270,12 @@ func Op(ctx context.Context, op string) *slog.Logger {
 func DebugEnabled(ctx context.Context) bool {
 	return FromContext(ctx).Enabled(ctx, slog.LevelDebug)
 }
+
+// Val makes a nullable field loggable: slog prints a pointer as its address
+// (department_id=0xc000123456), so log *p instead, or nil.
+func Val[T any](p *T) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}

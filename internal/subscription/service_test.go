@@ -3,6 +3,7 @@ package subscription
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"subtrack/internal/apperr"
@@ -314,5 +315,36 @@ func TestListAssignmentsScope(t *testing.T) {
 	}
 	if n := count(f.emp); n != 2 {
 		t.Errorf("employee: %d, want 2", n)
+	}
+}
+
+func TestAuditTrail(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	s := f.create(t, domain.Subscription{Name: "Jira", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(1))})
+	a, _ := f.svc.Assign(ctx, f.mgr, s.ID, f.emp.ID)
+	_, _ = f.svc.Assign(ctx, f.mgr, s.ID, f.emp2.ID)
+	_, _ = f.svc.Revoke(ctx, f.emp, a.ID)
+	_, _ = f.svc.Update(ctx, f.admin, s.ID, domain.SubscriptionPatch{Status: ptr(domain.SubCancelled), EndDate: domain.DatePatch{Set: true}})
+	_ = f.svc.Delete(ctx, f.admin, s.ID)
+	// A refused change leaves no record.
+	_, _ = f.svc.Assign(ctx, f.mgr, s.ID, f.emp.ID)
+
+	want := []string{"subscription.create", "assignment.create", "assignment.create", "assignment.revoke",
+		"subscription.update", "subscription.delete"}
+	got := f.audit.Actions()
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("actions:\n got %v\nwant %v", got, want)
+	}
+	revoke := f.audit.Entries[3]
+	if *revoke.ActorID != f.emp.ID || *revoke.EntityID != a.ID || revoke.Details["user_id"] != f.emp.ID {
+		t.Errorf("revoke entry: %+v", revoke)
+	}
+	cancel := f.audit.Entries[4].Details
+	if cancel["status"] != "cancelled" || cancel["end_date"] != nil || cancel["licences_revoked"] != 1 {
+		t.Errorf("cancel details: %+v", cancel)
+	}
+	if del := f.audit.Entries[5].Details; del["name"] != "Jira" {
+		t.Errorf("delete details: %+v", del)
 	}
 }

@@ -61,15 +61,30 @@ type departments interface {
 	GetByID(ctx context.Context, id int64) (domain.Department, error)
 }
 
-// Service implements the users use cases.
+// transactor runs fn in one transaction; *pg.TxRunner satisfies it.
+type transactor interface {
+	InTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// auditor records a change in the audit trail; *audit.Store satisfies it.
+// It is called inside the change's transaction.
+type auditor interface {
+	Record(ctx context.Context, e domain.AuditEntry) error
+}
+
+// Service implements the users use cases. Every write runs in a transaction
+// together with its audit record.
 type Service struct {
 	repo  repo
 	depts departments
+	tx    transactor
+	audit auditor
 }
 
-// New wires a Service over the users repo and the departments reader.
-func New(r repo, d departments) *Service {
-	return &Service{repo: r, depts: d}
+// New wires a Service over the users repo, the departments reader, the
+// transaction runner and the audit trail.
+func New(r repo, d departments, tx transactor, a auditor) *Service {
+	return &Service{repo: r, depts: d, tx: tx, audit: a}
 }
 
 // CreateUserInput carries the fields of a new user. Password is plaintext;
@@ -152,7 +167,7 @@ func (s *Service) List(ctx context.Context, actor domain.User, f domain.UserFilt
 //   - ErrUnknownDepartment when DepartmentID names no department.
 //   - ErrEmailTaken when the email belongs to another user.
 //   - any other datastore failure, propagated.
-func (s *Service) Create(ctx context.Context, in CreateUserInput) (domain.User, error) {
+func (s *Service) Create(ctx context.Context, actor domain.User, in CreateUserInput) (domain.User, error) {
 	log := logger.Op(ctx, "user.Service.Create")
 	in.FullName = strings.TrimSpace(in.FullName)
 	in.Email = strings.TrimSpace(in.Email)
@@ -185,13 +200,23 @@ func (s *Service) Create(ctx context.Context, in CreateUserInput) (domain.User, 
 		return domain.User{}, err
 	}
 
-	u, err := s.repo.Create(ctx, domain.User{
-		FullName:     in.FullName,
-		Email:        in.Email,
-		PasswordHash: hash,
-		Role:         in.Role,
-		DepartmentID: in.DepartmentID,
-		IsActive:     true,
+	var u domain.User
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		u, err = s.repo.Create(ctx, domain.User{
+			FullName:     in.FullName,
+			Email:        in.Email,
+			PasswordHash: hash,
+			Role:         in.Role,
+			DepartmentID: in.DepartmentID,
+			IsActive:     true,
+		})
+		if err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "user.create", "user", u.ID, map[string]any{
+			"full_name": u.FullName, "email": u.Email, "role": string(u.Role), "department_id": u.DepartmentID,
+		}))
 	})
 	if err != nil {
 		return domain.User{}, mapWriteErr(err)
@@ -248,7 +273,15 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 		}
 	}
 
-	u, err := s.repo.Update(ctx, id, p, actor.ID)
+	var u domain.User
+	err := s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		u, err = s.repo.Update(ctx, id, p, actor.ID)
+		if err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "user.update", "user", id, patchDetails(p)))
+	})
 	if err != nil {
 		return domain.User{}, mapWriteErr(err)
 	}
@@ -263,13 +296,19 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 //   - apperr.ErrInvalidInput when the password breaks the length rules.
 //   - ErrUserNotFound when no user has that id.
 //   - any other datastore failure, propagated.
-func (s *Service) SetPassword(ctx context.Context, id int64, pw string) error {
+func (s *Service) SetPassword(ctx context.Context, actor domain.User, id int64, pw string) error {
 	log := logger.Op(ctx, "user.Service.SetPassword")
 	hash, err := password.Hash(pw)
 	if err != nil {
 		return err
 	}
-	if err := s.repo.SetPasswordHash(ctx, id, hash); err != nil {
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		if err := s.repo.SetPasswordHash(ctx, id, hash); err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "user.password_reset", "user", id, nil))
+	})
+	if err != nil {
 		return apperr.MapStorage(err, ErrUserNotFound)
 	}
 	log.Info("password reset", "id", id)
@@ -313,4 +352,26 @@ func validateRole(r domain.Role) error {
 		return fmt.Errorf("%w: role must be one of admin, manager, employee", apperr.ErrInvalidInput)
 	}
 	return nil
+}
+
+// patchDetails lists the fields an update sets, with their new values, for
+// the audit trail.
+func patchDetails(p domain.UserPatch) map[string]any {
+	d := map[string]any{}
+	if p.FullName != nil {
+		d["full_name"] = *p.FullName
+	}
+	if p.Email != nil {
+		d["email"] = *p.Email
+	}
+	if p.Role != nil {
+		d["role"] = string(*p.Role)
+	}
+	if p.DepartmentID.Set {
+		d["department_id"] = p.DepartmentID.Value
+	}
+	if p.IsActive != nil {
+		d["is_active"] = *p.IsActive
+	}
+	return d
 }

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"subtrack/internal/apperr"
 	"subtrack/internal/domain"
@@ -78,16 +79,32 @@ type departments interface {
 	GetByID(ctx context.Context, id int64) (domain.Department, error)
 }
 
-// Service implements the subscriptions and assignments use cases.
+// transactor runs fn in one transaction; *pg.TxRunner satisfies it.
+type transactor interface {
+	InTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// auditor records a change in the audit trail; *audit.Store satisfies it.
+// It is called inside the change's transaction.
+type auditor interface {
+	Record(ctx context.Context, e domain.AuditEntry) error
+}
+
+// Service implements the subscriptions and assignments use cases. Every
+// write runs in a transaction together with its audit record; called inside
+// another domain's transaction (an approved request), it joins it.
 type Service struct {
 	repo  repo
 	users users
 	depts departments
+	tx    transactor
+	audit auditor
 }
 
-// New wires a Service over its repo and the users and departments readers.
-func New(r repo, u users, d departments) *Service {
-	return &Service{repo: r, users: u, depts: d}
+// New wires a Service over its repo, the users and departments readers, the
+// transaction runner and the audit trail.
+func New(r repo, u users, d departments, tx transactor, a auditor) *Service {
+	return &Service{repo: r, users: u, depts: d, tx: tx, audit: a}
 }
 
 // scopeFor returns what actor may see: everything for the admin; their
@@ -182,11 +199,22 @@ func (s *Service) Create(ctx context.Context, actor domain.User, sub domain.Subs
 	if err := s.checkRefs(ctx, sub.Currency, sub.DepartmentID); err != nil {
 		return domain.Subscription{}, err
 	}
-	out, err := s.repo.Create(ctx, sub)
+	var out domain.Subscription
+	err := s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.Create(ctx, sub)
+		if err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "subscription.create", "subscription", out.ID, map[string]any{
+			"name": out.Name, "type": string(out.Type), "cost": out.Cost, "currency": out.Currency,
+			"department_id": out.DepartmentID, "seats_total": out.SeatsTotal,
+		}))
+	})
 	if err != nil {
 		return domain.Subscription{}, mapWriteErr(err)
 	}
-	log.Info("subscription created", "id", out.ID, "type", out.Type, "department_id", out.DepartmentID)
+	log.Info("subscription created", "id", out.ID, "type", out.Type, "department_id", logger.Val(out.DepartmentID))
 	return out, nil
 }
 
@@ -233,7 +261,19 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 		return domain.Subscription{}, err
 	}
 
-	out, err := s.repo.Update(ctx, sub, actor.ID)
+	var out domain.Subscription
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.Update(ctx, sub, actor.ID)
+		if err != nil {
+			return err
+		}
+		details := patchDetails(p)
+		if cur.Status != domain.SubCancelled && out.Status == domain.SubCancelled {
+			details["licences_revoked"] = cur.SeatsUsed
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "subscription.update", "subscription", id, details))
+	})
 	if err != nil {
 		return domain.Subscription{}, mapWriteErr(err)
 	}
@@ -252,7 +292,19 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 //   - any other datastore failure, propagated.
 func (s *Service) Delete(ctx context.Context, actor domain.User, id int64) error {
 	log := logger.Op(ctx, "subscription.Service.Delete")
-	if err := s.repo.Delete(ctx, id, actor.ID); err != nil {
+	err := s.tx.InTx(ctx, func(ctx context.Context) error {
+		// Read it first: the record names what was deleted.
+		cur, err := s.repo.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := s.repo.Delete(ctx, id, actor.ID); err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "subscription.delete", "subscription", id,
+			map[string]any{"name": cur.Name, "licences_revoked": cur.SeatsUsed}))
+	})
+	if err != nil {
 		return apperr.MapStorage(err, ErrSubscriptionNotFound)
 	}
 	log.Info("subscription deleted", "id", id)
@@ -419,4 +471,56 @@ func mapWriteErr(err error) error {
 		return ErrSeatsBelowUsed
 	}
 	return apperr.MapStorage(err, ErrSubscriptionNotFound)
+}
+
+// patchDetails lists the fields an update sets, with their new values, for
+// the audit trail.
+func patchDetails(p domain.SubscriptionPatch) map[string]any {
+	d := map[string]any{}
+	day := func(t *time.Time) any {
+		if t == nil {
+			return nil
+		}
+		return t.Format(time.DateOnly)
+	}
+	if p.Name != nil {
+		d["name"] = *p.Name
+	}
+	if p.Vendor != nil {
+		d["vendor"] = *p.Vendor
+	}
+	if p.Category != nil {
+		d["category"] = *p.Category
+	}
+	if p.Type != nil {
+		d["type"] = string(*p.Type)
+	}
+	if p.Cost != nil {
+		d["cost"] = *p.Cost
+	}
+	if p.Currency != nil {
+		d["currency"] = *p.Currency
+	}
+	if p.BillingPeriod != nil {
+		d["billing_period"] = string(*p.BillingPeriod)
+	}
+	if p.StartDate != nil {
+		d["start_date"] = day(p.StartDate)
+	}
+	if p.EndDate.Set {
+		d["end_date"] = day(p.EndDate.Value)
+	}
+	if p.NextPaymentDate.Set {
+		d["next_payment_date"] = day(p.NextPaymentDate.Value)
+	}
+	if p.Status != nil {
+		d["status"] = string(*p.Status)
+	}
+	if p.DepartmentID.Set {
+		d["department_id"] = p.DepartmentID.Value
+	}
+	if p.SeatsTotal != nil {
+		d["seats_total"] = *p.SeatsTotal
+	}
+	return d
 }

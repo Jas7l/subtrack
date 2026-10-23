@@ -14,9 +14,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"subtrack/internal/audit"
 	"subtrack/internal/auth"
 	"subtrack/internal/department"
 	"subtrack/internal/httpx"
+	"subtrack/internal/notification"
 	"subtrack/internal/pg"
 	"subtrack/internal/request"
 	"subtrack/internal/subscription"
@@ -39,9 +41,14 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.NotFoundHandler = r.NotFoundHandler
 
+	// Every write runs in a transaction (tx) together with its audit record;
+	// stores join it through pg.Conn.
+	tx := pg.NewTxRunner(pool)
+	trail := audit.NewStore(pool)
+	inbox := notification.NewStore(pool)
 	users := user.NewStore(pool)
 	depts := department.NewStore(pool)
-	authSvc := auth.New(users, authCfg)
+	authSvc := auth.New(users, authCfg, tx, trail)
 	if err := authSvc.EnsureAdmin(ctx, authCfg.Bootstrap); err != nil {
 		return err
 	}
@@ -54,10 +61,12 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	protected.Use(authSvc.Middleware)
 
 	auth.RegisterRoutes(api, protected, authSvc)
-	user.RegisterRoutes(protected, user.New(users, depts))
-	department.RegisterRoutes(protected, department.New(depts, users))
-	subs := subscription.New(subscription.NewStore(pool), users, depts)
+	user.RegisterRoutes(protected, user.New(users, depts, tx, trail))
+	department.RegisterRoutes(protected, department.New(depts, users, tx, trail))
+	subs := subscription.New(subscription.NewStore(pool), users, depts, tx, trail)
 	subscription.RegisterRoutes(protected, subs)
-	request.RegisterRoutes(protected, request.New(request.NewStore(pool), depts, subs, pg.NewTxRunner(pool)))
+	request.RegisterRoutes(protected, request.New(request.NewStore(pool), depts, subs, tx, trail, inbox))
+	notification.RegisterRoutes(protected, notification.New(inbox))
+	audit.RegisterRoutes(protected, audit.New(trail))
 	return nil
 }

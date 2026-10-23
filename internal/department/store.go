@@ -12,7 +12,8 @@ import (
 )
 
 // Store reads and writes subtrack.departments. The pool is borrowed, not
-// owned.
+// owned. Every method runs on pg.Conn(ctx, pool), so it joins a transaction
+// started by pg.TxRunner (its own transactions become savepoints).
 type Store struct {
 	pool *pgxpool.Pool
 }
@@ -53,7 +54,7 @@ func getDepartment(ctx context.Context, q queryRower, id int64) (domain.Departme
 //   - storage.ErrNotFound when no row has that id.
 //   - any other db error wrapped as "postgres: get department: ...".
 func (s *Store) GetByID(ctx context.Context, id int64) (domain.Department, error) {
-	d, err := getDepartment(ctx, s.pool, id)
+	d, err := getDepartment(ctx, pg.Conn(ctx, s.pool), id)
 	if err != nil {
 		return domain.Department{}, pg.Translate(ctx, "get department", err)
 	}
@@ -75,14 +76,14 @@ func (s *Store) List(ctx context.Context, query string, limit, offset int) ([]do
 	}
 
 	var total int64
-	if err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM subtrack.departments d`+where, args...).Scan(&total); err != nil {
+	if err := pg.Conn(ctx, s.pool).QueryRow(ctx, `SELECT COUNT(*) FROM subtrack.departments d`+where, args...).Scan(&total); err != nil {
 		return nil, 0, pg.Translate(ctx, "count departments", err)
 	}
 
 	args = append(args, limit, offset)
 	q := selectDepartment + where +
 		` ORDER BY d.name, d.id LIMIT $` + pg.Itoa(len(args)-1) + ` OFFSET $` + pg.Itoa(len(args))
-	rows, err := s.pool.Query(ctx, q, args...)
+	rows, err := pg.Conn(ctx, s.pool).Query(ctx, q, args...)
 	if err != nil {
 		return nil, 0, pg.Translate(ctx, "list departments", err)
 	}
@@ -115,7 +116,7 @@ func (s *Store) List(ctx context.Context, query string, limit, offset int) ([]do
 //   - wrapped storage.ErrNotFound when HeadID names no user.
 //   - any other db error wrapped as "postgres: create department: ...".
 func (s *Store) Create(ctx context.Context, d domain.Department) (domain.Department, error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
 		return domain.Department{}, pg.Translate(ctx, "begin create department", err)
 	}
@@ -169,7 +170,7 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.DepartmentPatch) 
 	q := `UPDATE subtrack.departments SET ` + strings.Join(sets, ", ") +
 		` WHERE id = $` + pg.Itoa(len(args)) + ` RETURNING id`
 
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
 		return domain.Department{}, pg.Translate(ctx, "begin update department", err)
 	}
@@ -212,7 +213,7 @@ func moveHead(ctx context.Context, tx pgx.Tx, deptID, headID int64) error {
 //   - storage.ErrNotFound when no row has that id.
 //   - any other db error wrapped as "postgres: delete department: ...".
 func (s *Store) Delete(ctx context.Context, id int64) (users, subscriptions int64, err error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
 		return 0, 0, pg.Translate(ctx, "begin delete department", err)
 	}

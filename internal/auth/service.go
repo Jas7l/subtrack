@@ -72,19 +72,35 @@ var dummyHash = sync.OnceValue(func() string {
 	return h
 })
 
+// transactor runs fn in one transaction; *pg.TxRunner satisfies it.
+type transactor interface {
+	InTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// auditor records a change in the audit trail; *audit.Store satisfies it.
+type auditor interface {
+	Record(ctx context.Context, e domain.AuditEntry) error
+}
+
 // Service implements login, token verification, password change and the
-// first-admin bootstrap.
+// first-admin bootstrap. The two writes (password change, bootstrap) run in
+// a transaction together with their audit record.
 type Service struct {
 	repo   repo
 	tokens tokens
+	tx     transactor
+	audit  auditor
 }
 
 // New wires a Service over the given repo with the signing key and token
-// lifetime from cfg. cfg must have passed Validate.
-func New(r repo, cfg Config) *Service {
+// lifetime from cfg, the transaction runner and the audit trail. cfg must
+// have passed Validate.
+func New(r repo, cfg Config, tx transactor, a auditor) *Service {
 	return &Service{
 		repo:   r,
 		tokens: tokens{secret: cfg.Secret, ttl: cfg.TokenTTL, now: time.Now},
+		tx:     tx,
+		audit:  a,
 	}
 }
 
@@ -199,7 +215,13 @@ func (s *Service) ChangePassword(ctx context.Context, userID int64, current, nex
 	if err != nil {
 		return err
 	}
-	if err := s.repo.SetPasswordHash(ctx, userID, hash); err != nil {
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		if err := s.repo.SetPasswordHash(ctx, userID, hash); err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(userID, "user.password_change", "user", userID, nil))
+	})
+	if err != nil {
 		log.Error("store password failed", "user_id", userID, "err", err)
 		return apperr.MapStorage(err, ErrUnauthenticated)
 	}
@@ -240,12 +262,22 @@ func (s *Service) EnsureAdmin(ctx context.Context, b BootstrapAdmin) error {
 	if err != nil {
 		return fmt.Errorf("auth: bootstrap admin: %w", err)
 	}
-	u, err := s.repo.Create(ctx, domain.User{
-		FullName:     b.FullName,
-		Email:        strings.TrimSpace(b.Email),
-		PasswordHash: hash,
-		Role:         domain.RoleAdmin,
-		IsActive:     true,
+	var u domain.User
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		u, err = s.repo.Create(ctx, domain.User{
+			FullName:     b.FullName,
+			Email:        strings.TrimSpace(b.Email),
+			PasswordHash: hash,
+			Role:         domain.RoleAdmin,
+			IsActive:     true,
+		})
+		if err != nil {
+			return err
+		}
+		// Nobody is signed in yet: the system is the actor.
+		return s.audit.Record(ctx, domain.AuditEntry{Action: "user.create", EntityType: "user", EntityID: &u.ID,
+			Details: map[string]any{"email": u.Email, "role": string(u.Role), "bootstrap": true}})
 	})
 	if errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("auth: bootstrap admin: %w: %s belongs to a user who is not an active admin",

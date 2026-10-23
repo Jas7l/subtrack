@@ -16,6 +16,10 @@
 // The admin's approval runs in one transaction: create the subscription (if
 // new), hand out the licence, mark the request approved. If the licence
 // cannot be handed out, nothing changes and the request stays pending.
+//
+// Every change is recorded in the audit trail and notifies people, in the
+// same transaction: the reviewer whose turn it is (the department head, or
+// every active admin) and the requester on every decision.
 package request
 
 import (
@@ -99,17 +103,30 @@ type transactor interface {
 	InTx(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
+// auditor records a change in the audit trail; *audit.Store satisfies it.
+type auditor interface {
+	Record(ctx context.Context, e domain.AuditEntry) error
+}
+
+// notifier stores in-app notifications; *notification.Store satisfies it.
+type notifier interface {
+	Send(ctx context.Context, n domain.Notification) error
+	SendToAdmins(ctx context.Context, n domain.Notification) error
+}
+
 // Service implements the requests use cases.
 type Service struct {
-	repo  repo
-	depts departments
-	subs  subscriptions
-	tx    transactor
+	repo   repo
+	depts  departments
+	subs   subscriptions
+	tx     transactor
+	audit  auditor
+	notify notifier
 }
 
 // New wires a Service.
-func New(r repo, d departments, subs subscriptions, tx transactor) *Service {
-	return &Service{repo: r, depts: d, subs: subs, tx: tx}
+func New(r repo, d departments, subs subscriptions, tx transactor, a auditor, n notifier) *Service {
+	return &Service{repo: r, depts: d, subs: subs, tx: tx, audit: a, notify: n}
 }
 
 // CreateRequestInput carries what the requester describes.
@@ -245,9 +262,9 @@ func (s *Service) Create(ctx context.Context, actor domain.User, in CreateReques
 	}
 
 	r.Status = domain.ReqPendingAdmin
+	var head *int64
 	if actor.Role == domain.RoleEmployee {
-		head, err := s.headOf(ctx, r.DepartmentID)
-		if err != nil {
+		if head, err = s.headOf(ctx, r.DepartmentID); err != nil {
 			return domain.Request{}, err
 		}
 		if head != nil {
@@ -255,11 +272,23 @@ func (s *Service) Create(ctx context.Context, actor domain.User, in CreateReques
 		}
 	}
 
-	out, err := s.repo.Create(ctx, r)
+	var out domain.Request
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.Create(ctx, r)
+		if err != nil {
+			return err
+		}
+		if err := s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "request.create", "request", out.ID,
+			map[string]any{"name": out.Name, "status": string(out.Status)})); err != nil {
+			return err
+		}
+		return s.notifyReviewer(ctx, out, head)
+	})
 	if err != nil {
 		return domain.Request{}, err
 	}
-	log.Info("request created", "id", out.ID, "status", out.Status, "department_id", out.DepartmentID)
+	log.Info("request created", "id", out.ID, "status", out.Status, "department_id", logger.Val(out.DepartmentID))
 	return out, nil
 }
 
@@ -299,7 +328,10 @@ func (s *Service) Decide(ctx context.Context, actor domain.User, id int64, v Ver
 		if picked {
 			return domain.Request{}, fmt.Errorf("%w: only the admin picks the subscription", apperr.ErrInvalidInput)
 		}
-		out, err = s.decideAsManager(ctx, actor, id, v)
+		err = s.tx.InTx(ctx, func(ctx context.Context) error {
+			out, err = s.decideAsManager(ctx, actor, id, v)
+			return err
+		})
 	case domain.RoleAdmin:
 		if v.Approve && (v.SubscriptionID == nil) == (v.NewSubscription == nil) {
 			return domain.Request{}, fmt.Errorf("%w: approve with either subscription_id or subscription, not both or neither", apperr.ErrInvalidInput)
@@ -314,8 +346,7 @@ func (s *Service) Decide(ctx context.Context, actor domain.User, id int64, v Ver
 	if err != nil {
 		return domain.Request{}, err
 	}
-	// Stage 6: notify the requester of the decision here.
-	log.Info("request decided", "id", id, "status", out.Status, "by", actor.ID, "subscription_id", out.SubscriptionID)
+	log.Info("request decided", "id", id, "status", out.Status, "by", actor.ID, "subscription_id", logger.Val(out.SubscriptionID))
 	return out, nil
 }
 
@@ -342,7 +373,30 @@ func (s *Service) decideAsManager(ctx context.Context, actor domain.User, id int
 	if errors.Is(err, storage.ErrNotFound) {
 		return domain.Request{}, ErrNotPending // decided or cancelled meanwhile
 	}
-	return out, err
+	if err != nil {
+		return domain.Request{}, err
+	}
+	if err := s.recordDecision(ctx, actor, out, "manager", v, nil); err != nil {
+		return domain.Request{}, err
+	}
+	n := domain.Notification{
+		UserID: out.RequesterID,
+		Type:   domain.NotifyRequestRejected,
+		Title:  "Заявка отклонена: " + out.Name,
+		Body:   withComment("Начальник отдела отклонил заявку.", v.Comment),
+	}
+	if v.Approve {
+		n.Type = domain.NotifyRequestApproved
+		n.Title = "Начальник одобрил заявку: " + out.Name
+		n.Body = withComment("Заявка передана администратору.", v.Comment)
+	}
+	if err := s.notify.Send(ctx, n); err != nil {
+		return domain.Request{}, err
+	}
+	if v.Approve {
+		return out, s.notifyReviewer(ctx, out, nil)
+	}
+	return out, nil
 }
 
 // decideAsAdmin runs inside a transaction: the request row stays locked
@@ -367,23 +421,76 @@ func (s *Service) decideAsAdmin(ctx context.Context, actor domain.User, id int64
 	}
 
 	d := domain.Decision{ReviewerID: actor.ID, Approve: v.Approve, Comment: v.Comment}
+	n := domain.Notification{
+		UserID: r.RequesterID,
+		Type:   domain.NotifyRequestRejected,
+		Title:  "Заявка отклонена: " + r.Name,
+		Body:   withComment("Администратор отклонил заявку.", v.Comment),
+	}
 	if v.Approve {
-		subID, err := s.grant(ctx, actor, r, v)
+		a, err := s.grant(ctx, actor, r, v)
 		if err != nil {
 			return domain.Request{}, err
 		}
-		d.SubscriptionID = &subID
+		d.SubscriptionID = &a.SubscriptionID
+		n.Type = domain.NotifyRequestApproved
+		n.Title = "Заявка одобрена: " + r.Name
+		n.Body = withComment("Вам выдана лицензия «"+a.SubscriptionName+"».", v.Comment)
 	}
 	out, err := s.repo.DecideAsAdmin(ctx, id, d)
 	if errors.Is(err, storage.ErrNotFound) {
 		return domain.Request{}, ErrNotPending
 	}
-	return out, err
+	if err != nil {
+		return domain.Request{}, err
+	}
+	if err := s.recordDecision(ctx, actor, out, "admin", v, d.SubscriptionID); err != nil {
+		return domain.Request{}, err
+	}
+	return out, s.notify.Send(ctx, n)
+}
+
+// recordDecision writes the audit entry of a decision at stage ("manager" or
+// "admin").
+func (s *Service) recordDecision(ctx context.Context, actor domain.User, r domain.Request, stage string, v Verdict, subID *int64) error {
+	action := "request.reject"
+	if v.Approve {
+		action = "request.approve"
+	}
+	details := map[string]any{"stage": stage, "status": string(r.Status), "comment": v.Comment}
+	if subID != nil {
+		details["subscription_id"] = *subID
+	}
+	return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, action, "request", r.ID, details))
+}
+
+// notifyReviewer tells whoever decides next that r waits for them: head when
+// it is at pending_manager, every active admin when it is at pending_admin.
+func (s *Service) notifyReviewer(ctx context.Context, r domain.Request, head *int64) error {
+	n := domain.Notification{
+		Type:  domain.NotifyRequestCreated,
+		Title: "Новая заявка: " + r.Name,
+		Body:  r.RequesterName + " просит «" + r.Name + "». Обоснование: " + r.Justification,
+	}
+	if r.Status == domain.ReqPendingManager && head != nil {
+		n.UserID = *head
+		return s.notify.Send(ctx, n)
+	}
+	return s.notify.SendToAdmins(ctx, n)
+}
+
+// withComment appends the reviewer's comment, if any, to a notification
+// body.
+func withComment(body, comment string) string {
+	if comment == "" {
+		return body
+	}
+	return body + " Комментарий: " + comment
 }
 
 // grant creates the subscription when the verdict brings a new one, then
-// hands the requester a licence of it, and returns its id.
-func (s *Service) grant(ctx context.Context, actor domain.User, r domain.Request, v Verdict) (int64, error) {
+// hands the requester a licence of it.
+func (s *Service) grant(ctx context.Context, actor domain.User, r domain.Request, v Verdict) (domain.Assignment, error) {
 	subID := int64(0)
 	if v.SubscriptionID != nil {
 		subID = *v.SubscriptionID
@@ -401,14 +508,11 @@ func (s *Service) grant(ctx context.Context, actor domain.User, r domain.Request
 		}
 		sub, err := s.subs.Create(ctx, actor, ns)
 		if err != nil {
-			return 0, err
+			return domain.Assignment{}, err
 		}
 		subID = sub.ID
 	}
-	if _, err := s.subs.Assign(ctx, actor, subID, r.RequesterID); err != nil {
-		return 0, err
-	}
-	return subID, nil
+	return s.subs.Assign(ctx, actor, subID, r.RequesterID)
 }
 
 // Cancel withdraws a pending request on behalf of its requester.
@@ -430,7 +534,15 @@ func (s *Service) Cancel(ctx context.Context, actor domain.User, id int64) (doma
 	if !r.Status.Pending() {
 		return domain.Request{}, ErrNotPending
 	}
-	out, err := s.repo.Cancel(ctx, id, actor.ID)
+	var out domain.Request
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.Cancel(ctx, id, actor.ID)
+		if err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "request.cancel", "request", id, nil))
+	})
 	if errors.Is(err, storage.ErrNotFound) {
 		return domain.Request{}, ErrNotPending
 	}

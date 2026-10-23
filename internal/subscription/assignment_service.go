@@ -122,7 +122,16 @@ func (s *Service) Assign(ctx context.Context, actor domain.User, subID, userID i
 		return domain.Assignment{}, ErrNoFreeSeats
 	}
 
-	a, err := s.repo.Assign(ctx, subID, userID, actor.ID)
+	var a domain.Assignment
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		a, err = s.repo.Assign(ctx, subID, userID, actor.ID)
+		if err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "assignment.create", "assignment", a.ID,
+			map[string]any{"subscription_id": subID, "subscription": a.SubscriptionName, "user_id": userID, "user": a.UserName}))
+	})
 	if err != nil {
 		return domain.Assignment{}, mapAssignErr(err)
 	}
@@ -147,7 +156,17 @@ func (s *Service) Revoke(ctx context.Context, actor domain.User, id int64) (doma
 	if a.Status == domain.AssignmentRevoked {
 		return domain.Assignment{}, ErrAlreadyRevoked
 	}
-	out, err := s.repo.Revoke(ctx, id, actor.ID)
+	var out domain.Assignment
+	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.repo.Revoke(ctx, id, actor.ID)
+		if err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "assignment.revoke", "assignment", id,
+			map[string]any{"subscription_id": out.SubscriptionID, "subscription": out.SubscriptionName,
+				"user_id": out.UserID, "user": out.UserName}))
+	})
 	if errors.Is(err, storage.ErrNotFound) {
 		// Revoked by someone else (or with the whole subscription) meanwhile.
 		return domain.Assignment{}, ErrAlreadyRevoked

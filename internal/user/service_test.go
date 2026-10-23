@@ -10,6 +10,7 @@ import (
 	"subtrack/internal/domain"
 	"subtrack/internal/paging"
 	"subtrack/internal/password"
+	"subtrack/internal/testkit"
 )
 
 // fixture: departments 1 and 2; an admin, a manager and two employees in
@@ -17,6 +18,7 @@ import (
 type fixture struct {
 	repo                       *fakeRepo
 	svc                        *Service
+	audit                      *testkit.Audit
 	admin, mgr, emp, emp2, out domain.User
 	lone                       domain.User
 }
@@ -24,7 +26,8 @@ type fixture struct {
 func newFixture(t *testing.T) fixture {
 	t.Helper()
 	repo := newFakeRepo()
-	f := fixture{repo: repo, svc: New(repo, fakeDepts{1: true, 2: true})}
+	f := fixture{repo: repo, audit: &testkit.Audit{}}
+	f.svc = New(repo, fakeDepts{1: true, 2: true}, &testkit.Tx{}, f.audit)
 	f.admin = repo.add(t, "admin@corp.ru", domain.RoleAdmin, nil)
 	f.mgr = repo.add(t, "mgr@corp.ru", domain.RoleManager, ptr(int64(1)))
 	f.emp = repo.add(t, "emp@corp.ru", domain.RoleEmployee, ptr(int64(1)))
@@ -107,7 +110,7 @@ func TestCreate(t *testing.T) {
 		Role: domain.RoleEmployee, DepartmentID: ptr(int64(2)),
 	}
 
-	u, err := f.svc.Create(ctx, valid)
+	u, err := f.svc.Create(ctx, f.admin, valid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +139,7 @@ func TestCreate(t *testing.T) {
 		in := valid
 		in.Email = "other@corp.ru"
 		tt.mutate(&in)
-		if _, err := f.svc.Create(ctx, in); !errors.Is(err, tt.want) {
+		if _, err := f.svc.Create(ctx, f.admin, in); !errors.Is(err, tt.want) {
 			t.Errorf("%s: err = %v, want %v", tt.name, err, tt.want)
 		}
 	}
@@ -188,21 +191,40 @@ func TestUpdate(t *testing.T) {
 	if u.IsActive || u.DepartmentID != nil || u.Email != "emp.new@corp.ru" {
 		t.Errorf("after update: %+v", u)
 	}
+	e := f.audit.Last()
+	if e.Action != "user.update" || *e.ActorID != f.admin.ID || *e.EntityID != f.emp.ID ||
+		e.Details["is_active"] != false || e.Details["email"] != "emp.new@corp.ru" || e.Details["department_id"] != (*int64)(nil) {
+		t.Errorf("audit entry: %+v", e)
+	}
+	if _, ok := e.Details["full_name"]; ok {
+		t.Error("audit lists a field the patch did not touch")
+	}
+}
+
+func TestAuditFailureFailsTheChange(t *testing.T) {
+	f := newFixture(t)
+	f.audit.Err = errors.New("audit down")
+	if _, err := f.svc.Update(context.Background(), f.admin, f.emp.ID, domain.UserPatch{FullName: ptr("X")}); err == nil {
+		t.Error("update succeeded although the audit record failed")
+	}
 }
 
 func TestSetPassword(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	if err := f.svc.SetPassword(ctx, f.emp.ID, "short"); !errors.Is(err, apperr.ErrInvalidInput) {
+	if err := f.svc.SetPassword(ctx, f.admin, f.emp.ID, "short"); !errors.Is(err, apperr.ErrInvalidInput) {
 		t.Errorf("short: err = %v", err)
 	}
-	if err := f.svc.SetPassword(ctx, 999, "long-enough"); !errors.Is(err, ErrUserNotFound) {
+	if err := f.svc.SetPassword(ctx, f.admin, 999, "long-enough"); !errors.Is(err, ErrUserNotFound) {
 		t.Errorf("missing user: err = %v", err)
 	}
-	if err := f.svc.SetPassword(ctx, f.emp.ID, "long-enough"); err != nil {
+	if err := f.svc.SetPassword(ctx, f.admin, f.emp.ID, "long-enough"); err != nil {
 		t.Fatal(err)
 	}
 	if !password.Check(f.repo.users[f.emp.ID].PasswordHash, "long-enough") {
 		t.Error("password not replaced")
+	}
+	if e := f.audit.Last(); e.Action != "user.password_reset" || len(e.Details) != 0 {
+		t.Errorf("audit entry: %+v", e)
 	}
 }

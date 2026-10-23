@@ -10,6 +10,7 @@ import (
 	"subtrack/internal/domain"
 	"subtrack/internal/paging"
 	"subtrack/internal/storage"
+	"subtrack/internal/testkit"
 )
 
 // fakeRepo is an in-memory departments table with the two unique rules
@@ -125,14 +126,14 @@ func newTestService() (*Service, *fakeRepo) {
 	for _, u := range []domain.User{admin, manager, manager2, blockedMgr, employee} {
 		users[u.ID] = u
 	}
-	return New(repo, users), repo
+	return New(repo, users, &testkit.Tx{}, &testkit.Audit{}), repo
 }
 
 func TestCreateAndHead(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService()
 
-	d, err := svc.Create(ctx, CreateDepartmentInput{Name: "  Разработка ", HeadID: &manager.ID})
+	d, err := svc.Create(ctx, admin, CreateDepartmentInput{Name: "  Разработка ", HeadID: &manager.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,11 +155,11 @@ func TestCreateAndHead(t *testing.T) {
 		{"head does not exist", CreateDepartmentInput{Name: "Дизайн", HeadID: ptr(int64(99))}, ErrInvalidHead},
 	}
 	for _, tt := range tests {
-		if _, err := svc.Create(ctx, tt.in); !errors.Is(err, tt.want) {
+		if _, err := svc.Create(ctx, admin, tt.in); !errors.Is(err, tt.want) {
 			t.Errorf("%s: err = %v, want %v", tt.name, err, tt.want)
 		}
 	}
-	if _, err := svc.Create(ctx, CreateDepartmentInput{Name: "Бухгалтерия"}); err != nil {
+	if _, err := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Бухгалтерия"}); err != nil {
 		t.Errorf("department without head: %v", err)
 	}
 }
@@ -166,8 +167,8 @@ func TestCreateAndHead(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService()
-	dev, _ := svc.Create(ctx, CreateDepartmentInput{Name: "Разработка", HeadID: &manager.ID})
-	design, _ := svc.Create(ctx, CreateDepartmentInput{Name: "Дизайн"})
+	dev, _ := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Разработка", HeadID: &manager.ID})
+	design, _ := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Дизайн"})
 
 	tests := []struct {
 		name  string
@@ -183,22 +184,22 @@ func TestUpdate(t *testing.T) {
 		{"missing department", 99, domain.DepartmentPatch{Name: ptr("X")}, ErrDepartmentNotFound},
 	}
 	for _, tt := range tests {
-		if _, err := svc.Update(ctx, tt.id, tt.patch); !errors.Is(err, tt.want) {
+		if _, err := svc.Update(ctx, admin, tt.id, tt.patch); !errors.Is(err, tt.want) {
 			t.Errorf("%s: err = %v, want %v", tt.name, err, tt.want)
 		}
 	}
 
 	// Re-assigning the current head to their own department is a no-op, not
 	// a clash with itself.
-	if _, err := svc.Update(ctx, dev.ID, domain.DepartmentPatch{HeadID: domain.IDPatch{Set: true, Value: &manager.ID}}); err != nil {
+	if _, err := svc.Update(ctx, admin, dev.ID, domain.DepartmentPatch{HeadID: domain.IDPatch{Set: true, Value: &manager.ID}}); err != nil {
 		t.Errorf("same head again: %v", err)
 	}
-	d, err := svc.Update(ctx, dev.ID, domain.DepartmentPatch{HeadID: domain.IDPatch{Set: true}})
+	d, err := svc.Update(ctx, admin, dev.ID, domain.DepartmentPatch{HeadID: domain.IDPatch{Set: true}})
 	if err != nil || d.HeadID != nil {
 		t.Errorf("clear head: %+v, %v", d, err)
 	}
 	// Now free, the manager can head the other department.
-	if _, err := svc.Update(ctx, design.ID, domain.DepartmentPatch{HeadID: domain.IDPatch{Set: true, Value: &manager.ID}}); err != nil {
+	if _, err := svc.Update(ctx, admin, design.ID, domain.DepartmentPatch{HeadID: domain.IDPatch{Set: true, Value: &manager.ID}}); err != nil {
 		t.Errorf("freed head moves: %v", err)
 	}
 }
@@ -206,17 +207,17 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	ctx := context.Background()
 	svc, repo := newTestService()
-	busy, _ := svc.Create(ctx, CreateDepartmentInput{Name: "Busy"})
-	empty, _ := svc.Create(ctx, CreateDepartmentInput{Name: "Empty"})
+	busy, _ := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Busy"})
+	empty, _ := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Empty"})
 	repo.inUse[busy.ID] = [2]int64{3, 1}
 
-	if err := svc.Delete(ctx, busy.ID); !errors.Is(err, ErrDepartmentNotEmpty) {
+	if err := svc.Delete(ctx, admin, busy.ID); !errors.Is(err, ErrDepartmentNotEmpty) {
 		t.Errorf("busy: err = %v, want ErrDepartmentNotEmpty", err)
 	}
-	if err := svc.Delete(ctx, empty.ID); err != nil {
+	if err := svc.Delete(ctx, admin, empty.ID); err != nil {
 		t.Errorf("empty: %v", err)
 	}
-	if err := svc.Delete(ctx, empty.ID); !errors.Is(err, ErrDepartmentNotFound) {
+	if err := svc.Delete(ctx, admin, empty.ID); !errors.Is(err, ErrDepartmentNotFound) {
 		t.Errorf("deleted twice: err = %v, want ErrDepartmentNotFound", err)
 	}
 }
@@ -224,8 +225,8 @@ func TestDelete(t *testing.T) {
 func TestReadScope(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newTestService()
-	dev, _ := svc.Create(ctx, CreateDepartmentInput{Name: "Разработка"})
-	other, _ := svc.Create(ctx, CreateDepartmentInput{Name: "Дизайн"})
+	dev, _ := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Разработка"})
+	other, _ := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Дизайн"})
 	member := domain.User{ID: 10, Role: domain.RoleEmployee, DepartmentID: &dev.ID}
 	homeless := domain.User{ID: 11, Role: domain.RoleManager}
 

@@ -10,6 +10,8 @@ import (
 	"subtrack/internal/domain"
 	"subtrack/internal/password"
 	"subtrack/internal/storage"
+
+	"subtrack/internal/testkit"
 )
 
 // fakeRepo is an in-memory users table. It mirrors the two rules of the real
@@ -109,5 +111,5 @@ func (f *fakeRepo) setActive(id int64, active bool) {
 }
 
 func newTestService(r repo) *Service {
-	return New(r, Config{Secret: testSecret, TokenTTL: time.Hour})
+	return New(r, Config{Secret: testSecret, TokenTTL: time.Hour}, &testkit.Tx{}, &testkit.Audit{})
 }

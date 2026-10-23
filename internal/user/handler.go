@@ -169,7 +169,8 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		writeErr(r.Context(), w, err)
 		return
 	}
-	u, err := h.svc.Create(r.Context(), CreateUserInput{
+	actor, _ := auth.UserFromContext(r.Context())
+	u, err := h.svc.Create(r.Context(), actor, CreateUserInput{
 		FullName:     req.FullName,
 		Email:        req.Email,
 		Password:     req.Password,
@@ -259,7 +260,8 @@ func (h *handler) setPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Op(r.Context(), "user.handler.setPassword").Debug("request", "id", id)
-	if err := h.svc.SetPassword(r.Context(), id, req.Password); err != nil {
+	actor, _ := auth.UserFromContext(r.Context())
+	if err := h.svc.SetPassword(r.Context(), actor, id, req.Password); err != nil {
 		writeErr(r.Context(), w, err)
 		return
 	}

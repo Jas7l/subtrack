@@ -3,6 +3,8 @@ package request
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"subtrack/internal/domain"
 	"subtrack/internal/paging"
 	"subtrack/internal/storage"
+	"subtrack/internal/testkit"
 )
 
 // fakeRepo is an in-memory requests table with the conditional decision
@@ -164,15 +167,44 @@ func (f *fakeTx) InTx(ctx context.Context, fn func(ctx context.Context) error) e
 	return fn(ctx)
 }
 
+// fakeNotify keeps what was sent; admins get one entry with UserID 0.
+type fakeNotify struct {
+	mu   sync.Mutex
+	sent []domain.Notification
+}
+
+func (f *fakeNotify) Send(_ context.Context, n domain.Notification) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, n)
+	return nil
+}
+
+func (f *fakeNotify) SendToAdmins(_ context.Context, n domain.Notification) error {
+	n.UserID = 0
+	return f.Send(context.Background(), n)
+}
+
+// to lists who got notified, in order (0: all admins), with the type.
+func (f *fakeNotify) to() []string {
+	var out []string
+	for _, n := range f.sent {
+		out = append(out, strconv.FormatInt(n.UserID, 10)+":"+string(n.Type))
+	}
+	return out
+}
+
 func ptr[T any](v T) *T { return &v }
 
 // fixture: department 1 (dev) headed by head; department 2 (design) without a
 // head; dev has a second, non-head manager.
 type fixture struct {
-	svc  *Service
-	repo *fakeRepo
-	subs *fakeSubs
-	tx   *fakeTx
+	svc    *Service
+	repo   *fakeRepo
+	subs   *fakeSubs
+	tx     *fakeTx
+	audit  *testkit.Audit
+	notify *fakeNotify
 
 	admin, head, mgr2, emp, emp2, designer, homeless domain.User
 }
@@ -183,6 +215,8 @@ func newFixture() fixture {
 		repo:     &fakeRepo{reqs: map[int64]domain.Request{}, nextID: 1},
 		subs:     &fakeSubs{},
 		tx:       &fakeTx{},
+		audit:    &testkit.Audit{},
+		notify:   &fakeNotify{},
 		admin:    domain.User{ID: 1, Role: domain.RoleAdmin, IsActive: true},
 		head:     domain.User{ID: 2, Role: domain.RoleManager, DepartmentID: &dev, IsActive: true},
 		mgr2:     domain.User{ID: 3, Role: domain.RoleManager, DepartmentID: &dev, IsActive: true},
@@ -191,7 +225,7 @@ func newFixture() fixture {
 		designer: domain.User{ID: 6, Role: domain.RoleEmployee, DepartmentID: &design, IsActive: true},
 		homeless: domain.User{ID: 7, Role: domain.RoleEmployee, IsActive: true},
 	}
-	f.svc = New(f.repo, fakeDepts{dev: &f.head.ID, design: nil}, f.subs, f.tx)
+	f.svc = New(f.repo, fakeDepts{dev: &f.head.ID, design: nil}, f.subs, f.tx, f.audit, f.notify)
 	return f
 }
 
@@ -279,6 +313,38 @@ func TestFullApprovalNewSubscription(t *testing.T) {
 	if _, err := f.svc.Decide(ctx, f.admin, r.ID, Verdict{Comment: "нет"}); !errors.Is(err, ErrNotPending) {
 		t.Errorf("decide approved: err = %v", err)
 	}
+
+	// head gets the new request; the requester hears of the head's approval;
+	// the admins get it next; the requester hears of the final approval.
+	wantTo := "2:request_created,4:request_approved,0:request_created,4:request_approved"
+	if got := strings.Join(f.notify.to(), ","); got != wantTo {
+		t.Errorf("notifications:\n got %s\nwant %s", got, wantTo)
+	}
+	wantAudit := "request.create,request.approve,request.approve"
+	if got := strings.Join(f.audit.Actions(), ","); got != wantAudit {
+		t.Errorf("audit: got %s, want %s", got, wantAudit)
+	}
+	if d := f.audit.Last().Details; d["stage"] != "admin" || d["subscription_id"] != int64(100) {
+		t.Errorf("final audit details: %+v", d)
+	}
+}
+
+func TestRejectionNotifiesWithComment(t *testing.T) {
+	f := newFixture()
+	ctx := context.Background()
+	r := f.file(t, f.emp)
+	if _, err := f.svc.Decide(ctx, f.head, r.ID, Verdict{Comment: "есть Canva"}); err != nil {
+		t.Fatal(err)
+	}
+	last := f.notify.sent[len(f.notify.sent)-1]
+	if last.UserID != f.emp.ID || last.Type != domain.NotifyRequestRejected || !strings.Contains(last.Body, "есть Canva") {
+		t.Errorf("rejection notification: %+v", last)
+	}
+	// A request straight to the admin notifies the admins, not a head.
+	f.file(t, f.designer)
+	if last := f.notify.sent[len(f.notify.sent)-1]; last.UserID != 0 {
+		t.Errorf("headless request notified user %d", last.UserID)
+	}
 }
 
 func TestAdminApprovalFails(t *testing.T) {
@@ -294,7 +360,7 @@ func TestAdminApprovalFails(t *testing.T) {
 	if got, _ := f.repo.GetByID(ctx, r.ID); got.Status != domain.ReqPendingAdmin {
 		t.Errorf("status after failed approval: %s", got.Status)
 	}
-	if f.tx.calls != 1 {
+	if f.tx.calls != 2 { // filing + the failed approval
 		t.Errorf("transactions: %d", f.tx.calls)
 	}
 
