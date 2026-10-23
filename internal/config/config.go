@@ -12,16 +12,18 @@ import (
 	"subtrack/internal/auth"
 	"subtrack/internal/logger"
 	"subtrack/internal/pg"
+	"subtrack/internal/scheduler"
 	httpsrv "subtrack/internal/transport/http"
 )
 
 // Config aggregates the per-layer configurations used by the binary. It is
 // constructed once at startup; layers receive only the slice they need.
 type Config struct {
-	HTTP httpsrv.Config
-	DB   pg.Config
-	Log  logger.Config
-	Auth auth.Config
+	HTTP      httpsrv.Config
+	DB        pg.Config
+	Log       logger.Config
+	Auth      auth.Config
+	Scheduler scheduler.Config
 }
 
 // Load reads each layer's configuration from the environment and stitches the
@@ -44,5 +46,9 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("config: auth: %w", err)
 	}
-	return Config{HTTP: httpCfg, DB: dbCfg, Log: logCfg, Auth: authCfg}, nil
+	schedCfg, err := scheduler.LoadConfig()
+	if err != nil {
+		return Config{}, fmt.Errorf("config: scheduler: %w", err)
+	}
+	return Config{HTTP: httpCfg, DB: dbCfg, Log: logCfg, Auth: authCfg, Scheduler: schedCfg}, nil
 }

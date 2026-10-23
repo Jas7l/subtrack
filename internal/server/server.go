@@ -21,6 +21,8 @@ import (
 	"subtrack/internal/notification"
 	"subtrack/internal/pg"
 	"subtrack/internal/request"
+	"subtrack/internal/scheduler"
+	"subtrack/internal/settings"
 	"subtrack/internal/subscription"
 	"subtrack/internal/user"
 )
@@ -68,5 +70,13 @@ func Mount(ctx context.Context, r *mux.Router, pool *pgxpool.Pool, authCfg auth.
 	request.RegisterRoutes(protected, request.New(request.NewStore(pool), depts, subs, tx, trail, inbox))
 	notification.RegisterRoutes(protected, notification.New(inbox))
 	audit.RegisterRoutes(protected, audit.New(trail))
+	settings.RegisterRoutes(protected, settings.New(settings.NewStore(pool), tx, trail))
 	return nil
+}
+
+// NewScheduler builds the background date checker over the same pool. The
+// caller runs it (Scheduler.Run) and stops it by cancelling its context.
+func NewScheduler(pool *pgxpool.Pool, cfg scheduler.Config) *scheduler.Scheduler {
+	return scheduler.New(scheduler.NewStore(pool), settings.NewStore(pool), pg.NewTxRunner(pool),
+		audit.NewStore(pool), notification.NewStore(pool), cfg)
 }

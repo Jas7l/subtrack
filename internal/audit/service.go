@@ -4,7 +4,7 @@
 // serve the trail to the admin.
 //
 // Actions are named "<entity>.<verb>"; the entity types are user,
-// department, subscription, assignment and request.
+// department, subscription, assignment, request and settings.
 package audit
 
 import (

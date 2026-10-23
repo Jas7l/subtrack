@@ -3,6 +3,9 @@
 // internal/server), and starts the HTTP server with graceful shutdown on
 // SIGINT / SIGTERM.
 //
+// A background scheduler (internal/scheduler) runs alongside the HTTP server
+// and stops with it.
+//
 // Configuration comes from environment variables; a .env file in the working
 // directory (or the file named by ENV_FILE) is read first, without overriding
 // variables that are already set.
@@ -22,6 +25,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// The zone database is embedded so SCHEDULER_TZ works on hosts without
+	// tzdata (minimal containers, some flatpaks).
+	_ "time/tzdata"
 
 	"github.com/gorilla/mux"
 
@@ -94,6 +100,18 @@ func run() error {
 	if err := server.Mount(ctx, r, pool, cfg.Auth); err != nil {
 		return err
 	}
+
+	// The scheduler stops before the pool closes: this defer runs first.
+	schedCtx, stopSched := context.WithCancel(ctx)
+	schedDone := make(chan struct{})
+	go func() {
+		defer close(schedDone)
+		server.NewScheduler(pool, cfg.Scheduler).Run(schedCtx)
+	}()
+	defer func() {
+		stopSched()
+		<-schedDone
+	}()
 
 	srv := &http.Server{
 		Addr:              cfg.HTTP.Addr,
