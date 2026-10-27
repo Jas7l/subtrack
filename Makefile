@@ -1,4 +1,4 @@
-.PHONY: install.dep lint vet test build run clean swagger
+.PHONY: install.dep lint vet test build run clean swagger seed
 
 PROJECTNAME ?= subtrack
 PROJECT_VERSION ?= 0.0.0
@@ -27,6 +27,11 @@ build:
 
 run: build
 	$(BUILD_DIR)/$(PROJECTNAME)
+
+# seed fills an empty database with demo data through the API of a running
+# server (see cmd/seed).
+seed:
+	go run ./cmd/seed
 
 clean:
 	go clean
