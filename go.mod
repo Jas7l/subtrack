@@ -2,6 +2,9 @@ module subtrack
 
 go 1.27
 
+// npm packages may ship .go files; keep ./... out of the web client deps.
+ignore ./web/node_modules
+
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/mux v1.8.1
