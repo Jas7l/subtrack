@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Учёт корпоративных подписок на ПО: реестр подписок и лицензий, заявки с согласованием (сотрудник → начальник отдела → админ), платежи, уведомления, аудит, аналитика и рекомендации по экономии.\nОтвет без ошибки — JSON с полем `data`, ошибка — JSON с полем `description`; суть результата передаёт HTTP-статус.\nВход: `POST /auth/login`, затем кнопка Authorize и значение `Bearer \u003ctoken\u003e`.",
+        "description": "Учёт корпоративных подписок на ПО: реестр подписок и лицензий, заявки с согласованием (сотрудник → начальник отдела → админ), платежи, уведомления, аудит, аналитика и рекомендации по экономии.\nУспешный ответ — сам объект (списки — `items` и `total`/`limit`/`offset`), без обёртки; ошибка — JSON с полем `description`. Суть результата передаёт HTTP-статус.\nВход: `POST /auth/login`, затем кнопка Authorize и значение `Bearer \u003ctoken\u003e`.",
         "title": "SubTrack API",
         "contact": {},
         "version": "1.0"
@@ -172,7 +172,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "One workbook: summary, cost by category, by vendor and (for the whole company) by department, the 20 most expensive subscriptions, paid by month for the last 12 months, a 12-month forecast and the recommendations.",
+                "description": "One workbook: summary, cost by category, by vendor and (for the whole company) by department, the 20 most expensive subscriptions, paid by month for the last 12 months, a 12-month forecast, the recommendations and the currency rates every rouble amount was converted at.",
                 "produces": [
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 ],
@@ -833,7 +833,10 @@
                             "department",
                             "subscription",
                             "assignment",
-                            "request"
+                            "request",
+                            "transaction",
+                            "settings",
+                            "currency"
                         ],
                         "type": "string",
                         "description": "Only this entity type",
@@ -1038,6 +1041,300 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/currencies": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every currency with its current rate to roubles, RUB first. Open to everyone signed in: forms need the list.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "currencies"
+                ],
+                "summary": "List currencies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/currency.ListCurrenciesResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "The code is three Latin letters (stored upper-case), the rate is how many roubles one unit costs: above 0, at most 6 decimals.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "currencies"
+                ],
+                "summary": "Add a currency (admin)",
+                "parameters": [
+                    {
+                        "description": "Currency fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/currency.CreateCurrencyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/currency.CurrencyDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/currencies/{code}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "currencies"
+                ],
+                "summary": "Get a currency",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "USD",
+                        "description": "Currency code, any case",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/currency.CurrencyDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Only a currency no subscription, request or payment uses (409 otherwise). RUB cannot be deleted (409).",
+                "tags": [
+                    "currencies"
+                ],
+                "summary": "Delete a currency (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "USD",
+                        "description": "Currency code, any case",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Rename and/or set a new rate; at least one field. The new rate applies at once to every report. The rate of RUB is fixed at 1 (409).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "currencies"
+                ],
+                "summary": "Update a currency (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "USD",
+                        "description": "Currency code, any case",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/currency.UpdateCurrencyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/currency.CurrencyDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorBody"
                         }
@@ -3875,6 +4172,72 @@
                         "employee"
                     ],
                     "example": "employee"
+                }
+            }
+        },
+        "currency.CreateCurrencyRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "USD"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Доллар США"
+                },
+                "rate_to_rub": {
+                    "type": "string",
+                    "example": "92.5"
+                }
+            }
+        },
+        "currency.CurrencyDTO": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "USD"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Доллар США"
+                },
+                "rate_to_rub": {
+                    "type": "string",
+                    "example": "92.5"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-27T10:00:00Z"
+                },
+                "updated_by": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "currency.ListCurrenciesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/currency.CurrencyDTO"
+                    }
+                }
+            }
+        },
+        "currency.UpdateCurrencyRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "Доллар США"
+                },
+                "rate_to_rub": {
+                    "type": "string",
+                    "example": "93.1"
                 }
             }
         },

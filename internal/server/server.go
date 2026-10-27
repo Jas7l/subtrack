@@ -18,6 +18,7 @@ import (
 	"subtrack/internal/analytics"
 	"subtrack/internal/audit"
 	"subtrack/internal/auth"
+	"subtrack/internal/currency"
 	"subtrack/internal/department"
 	"subtrack/internal/httpx"
 	"subtrack/internal/notification"
@@ -82,6 +83,7 @@ func routes(r *mux.Router, pool *pgxpool.Pool, authCfg auth.Config, loc *time.Lo
 	notification.RegisterRoutes(protected, notification.New(inbox))
 	audit.RegisterRoutes(protected, audit.New(trail))
 	settings.RegisterRoutes(protected, settings.New(settings.NewStore(pool), tx, trail))
+	currency.RegisterRoutes(protected, currency.New(currency.NewStore(pool), tx, trail))
 	transaction.RegisterRoutes(protected, transaction.New(transaction.NewStore(pool), subStore, tx, trail))
 	analytics.RegisterRoutes(protected, analytics.New(analytics.NewStore(pool), loc))
 	return authSvc

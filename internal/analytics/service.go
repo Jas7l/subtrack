@@ -52,6 +52,7 @@ type repo interface {
 	Departments(ctx context.Context) ([]dept, int, error)
 	Spending(ctx context.Context, from, to time.Time, deptID *int64) ([]monthSpend, error)
 	Payments(ctx context.Context, today time.Time, deptID *int64) (PaymentStats, error)
+	Rates(ctx context.Context) ([]domain.Currency, error)
 }
 
 // Service builds the reports.
@@ -182,6 +183,11 @@ type SpendingReport struct {
 	From, To time.Time // first days of the first and last months
 	Months   []monthSpend
 	TotalRUB string
+}
+
+// Rates returns the current rates every report converts at, RUB first.
+func (s *Service) Rates(ctx context.Context) ([]domain.Currency, error) {
+	return s.repo.Rates(ctx)
 }
 
 // Spending sums paid payments by month (the admin only), every month from

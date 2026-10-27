@@ -179,3 +179,31 @@ func (s *Store) Payments(ctx context.Context, today time.Time, deptID *int64) (P
 	}
 	return p, nil
 }
+
+// Rates returns every currency with its current rate, RUB first: the rates
+// the reports were converted at.
+//
+// Errors:
+//   - any db error wrapped as "postgres: analytics rates ...".
+func (s *Store) Rates(ctx context.Context) ([]domain.Currency, error) {
+	rows, err := pg.Conn(ctx, s.pool).Query(ctx, `
+		SELECT code, name, trim_scale(rate_to_rub)::text, updated_at
+		FROM subtrack.currencies
+		ORDER BY code <> 'RUB', code`)
+	if err != nil {
+		return nil, pg.Translate(ctx, "analytics rates", err)
+	}
+	defer rows.Close()
+	var out []domain.Currency
+	for rows.Next() {
+		var c domain.Currency
+		if err := rows.Scan(&c.Code, &c.Name, &c.RateToRUB, &c.UpdatedAt); err != nil {
+			return nil, pg.Translate(ctx, "analytics rates scan", err)
+		}
+		out = append(out, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, pg.Translate(ctx, "analytics rates rows", err)
+	}
+	return out, nil
+}

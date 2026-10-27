@@ -379,6 +379,52 @@ definitions:
         example: employee
         type: string
     type: object
+  currency.CreateCurrencyRequest:
+    properties:
+      code:
+        example: USD
+        type: string
+      name:
+        example: Доллар США
+        type: string
+      rate_to_rub:
+        example: "92.5"
+        type: string
+    type: object
+  currency.CurrencyDTO:
+    properties:
+      code:
+        example: USD
+        type: string
+      name:
+        example: Доллар США
+        type: string
+      rate_to_rub:
+        example: "92.5"
+        type: string
+      updated_at:
+        example: "2026-10-27T10:00:00Z"
+        type: string
+      updated_by:
+        example: 1
+        type: integer
+    type: object
+  currency.ListCurrenciesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/currency.CurrencyDTO'
+        type: array
+    type: object
+  currency.UpdateCurrencyRequest:
+    properties:
+      name:
+        example: Доллар США
+        type: string
+      rate_to_rub:
+        example: "93.1"
+        type: string
+    type: object
   department.CreateDepartmentRequest:
     properties:
       head_id:
@@ -1153,7 +1199,7 @@ info:
   contact: {}
   description: |-
     Учёт корпоративных подписок на ПО: реестр подписок и лицензий, заявки с согласованием (сотрудник → начальник отдела → админ), платежи, уведомления, аудит, аналитика и рекомендации по экономии.
-    Ответ без ошибки — JSON с полем `data`, ошибка — JSON с полем `description`; суть результата передаёт HTTP-статус.
+    Успешный ответ — сам объект (списки — `items` и `total`/`limit`/`offset`), без обёртки; ошибка — JSON с полем `description`. Суть результата передаёт HTTP-статус.
     Вход: `POST /auth/login`, затем кнопка Authorize и значение `Bearer <token>`.
   title: SubTrack API
   version: "1.0"
@@ -1265,7 +1311,8 @@ paths:
     get:
       description: 'One workbook: summary, cost by category, by vendor and (for the
         whole company) by department, the 20 most expensive subscriptions, paid by
-        month for the last 12 months, a 12-month forecast and the recommendations.'
+        month for the last 12 months, a 12-month forecast, the recommendations and
+        the currency rates every rouble amount was converted at.'
       parameters:
       - description: One department
         in: query
@@ -1706,6 +1753,9 @@ paths:
         - subscription
         - assignment
         - request
+        - transaction
+        - settings
+        - currency
         in: query
         name: entity_type
         type: string
@@ -1853,6 +1903,199 @@ paths:
       summary: Change own password
       tags:
       - auth
+  /currencies:
+    get:
+      description: 'Every currency with its current rate to roubles, RUB first. Open
+        to everyone signed in: forms need the list.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/currency.ListCurrenciesResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: List currencies
+      tags:
+      - currencies
+    post:
+      consumes:
+      - application/json
+      description: 'The code is three Latin letters (stored upper-case), the rate
+        is how many roubles one unit costs: above 0, at most 6 decimals.'
+      parameters:
+      - description: Currency fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/currency.CreateCurrencyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/currency.CurrencyDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Add a currency (admin)
+      tags:
+      - currencies
+  /currencies/{code}:
+    delete:
+      description: Only a currency no subscription, request or payment uses (409 otherwise).
+        RUB cannot be deleted (409).
+      parameters:
+      - description: Currency code, any case
+        example: USD
+        in: path
+        name: code
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Delete a currency (admin)
+      tags:
+      - currencies
+    get:
+      parameters:
+      - description: Currency code, any case
+        example: USD
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/currency.CurrencyDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Get a currency
+      tags:
+      - currencies
+    patch:
+      consumes:
+      - application/json
+      description: Rename and/or set a new rate; at least one field. The new rate
+        applies at once to every report. The rate of RUB is fixed at 1 (409).
+      parameters:
+      - description: Currency code, any case
+        example: USD
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/currency.UpdateCurrencyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/currency.CurrencyDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Update a currency (admin)
+      tags:
+      - currencies
   /departments:
     get:
       description: 'Admin: all departments, sorted by name. Anyone else: only their

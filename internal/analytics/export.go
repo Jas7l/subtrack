@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"subtrack/internal/auth"
+	"subtrack/internal/domain"
 	"subtrack/internal/xlsx"
 )
 
@@ -18,7 +19,7 @@ var recLabel = map[RecommendationType]string{
 // export godoc
 //
 //	@Summary		Export the analytics to Excel (admin)
-//	@Description	One workbook: summary, cost by category, by vendor and (for the whole company) by department, the 20 most expensive subscriptions, paid by month for the last 12 months, a 12-month forecast and the recommendations.
+//	@Description	One workbook: summary, cost by category, by vendor and (for the whole company) by department, the 20 most expensive subscriptions, paid by month for the last 12 months, a 12-month forecast, the recommendations and the currency rates every rouble amount was converted at.
 //	@Tags			analytics
 //	@Produce		application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 //	@Security		BearerAuth
@@ -68,6 +69,11 @@ func (h *handler) export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	recs, savings, err := h.svc.Recommendations(ctx, dept)
+	if err != nil {
+		writeErr(ctx, w, err)
+		return
+	}
+	rates, err := h.svc.Rates(ctx)
 	if err != nil {
 		writeErr(ctx, w, err)
 		return
@@ -129,7 +135,7 @@ func (h *handler) export(w http.ResponseWriter, r *http.Request) {
 	}
 	recSh.Rows = append(recSh.Rows, []any{"Итого", nil, nil, xlsx.Money(savings)})
 
-	sheets = append(sheets, topSh, spentSh, fcSh, recSh)
+	sheets = append(sheets, topSh, spentSh, fcSh, recSh, ratesSheet(rates))
 	xlsx.Respond(ctx, w, xlsx.Filename("analytics", h.svc.now(), h.svc.loc), sheets...)
 }
 
@@ -162,6 +168,21 @@ func summarySheet(s Summary) xlsx.Sheet {
 	if s.Recommendations != nil {
 		add("Рекомендаций", *s.Recommendations)
 		add("Возможная экономия в год, ₽", xlsx.Money(*s.PotentialSavingsRUB))
+	}
+	return sh
+}
+
+// ratesSheet lists the rates the rouble amounts of the workbook were
+// converted at. A rate is written as a plain number: it may carry up to 6
+// decimals, which the money format would round to 2.
+func ratesSheet(rates []domain.Currency) xlsx.Sheet {
+	sh := xlsx.Sheet{Name: "Курсы", Header: []string{"Валюта", "Название", "Курс к рублю", "Курс обновлён"}}
+	for _, c := range rates {
+		var rate any = c.RateToRUB
+		if n, err := strconv.ParseFloat(c.RateToRUB, 64); err == nil {
+			rate = n
+		}
+		sh.Rows = append(sh.Rows, []any{c.Code, c.Name, rate, c.UpdatedAt})
 	}
 	return sh
 }

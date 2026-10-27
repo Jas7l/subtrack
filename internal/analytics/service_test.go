@@ -46,6 +46,11 @@ func (f *fakeRepo) Spending(_ context.Context, from, to time.Time, _ *int64) ([]
 	return []monthSpend{{Month: day("2026-09-01"), AmountRUB: "1500.50", Payments: 2}}, nil
 }
 
+func (f *fakeRepo) Rates(context.Context) ([]domain.Currency, error) {
+	return []domain.Currency{{Code: "RUB", Name: "Российский рубль", RateToRUB: "1"},
+		{Code: "USD", Name: "Доллар США", RateToRUB: "92.5"}}, nil
+}
+
 func (f *fakeRepo) Payments(context.Context, time.Time, *int64) (PaymentStats, error) {
 	return PaymentStats{PaidThisMonthRUB: "10.00", PendingCount: 1}, nil
 }
@@ -208,8 +213,8 @@ func TestExportWorkbook(t *testing.T) {
 		query  string
 		sheets []string
 	}{
-		{"", []string{"Сводка", "Категории", "Вендоры", "Отделы", "Самые дорогие", "Оплачено по месяцам", "Прогноз", "Рекомендации"}},
-		{"?department_id=1", []string{"Сводка", "Категории", "Вендоры", "Самые дорогие", "Оплачено по месяцам", "Прогноз", "Рекомендации"}},
+		{"", []string{"Сводка", "Категории", "Вендоры", "Отделы", "Самые дорогие", "Оплачено по месяцам", "Прогноз", "Рекомендации", "Курсы"}},
+		{"?department_id=1", []string{"Сводка", "Категории", "Вендоры", "Самые дорогие", "Оплачено по месяцам", "Прогноз", "Рекомендации", "Курсы"}},
 	} {
 		req := httptest.NewRequest("GET", "/api/v1/analytics/export"+c.query, nil)
 		req = req.WithContext(auth.WithUser(req.Context(), admin))
@@ -234,6 +239,10 @@ func TestExportWorkbook(t *testing.T) {
 		rows, _ := f.GetRows("Рекомендации")
 		if len(rows) < 2 || rows[len(rows)-1][0] != "Итого" {
 			t.Errorf("recommendations sheet = %v", rows)
+		}
+		rows, _ = f.GetRows("Курсы")
+		if len(rows) != 3 || rows[1][0] != "RUB" || rows[2][0] != "USD" || rows[2][2] != "92.5" {
+			t.Errorf("rates sheet = %v", rows)
 		}
 	}
 }

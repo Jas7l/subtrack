@@ -45,7 +45,7 @@ var Version = "dev"
 // @title						SubTrack API
 // @version					1.0
 // @description				Учёт корпоративных подписок на ПО: реестр подписок и лицензий, заявки с согласованием (сотрудник → начальник отдела → админ), платежи, уведомления, аудит, аналитика и рекомендации по экономии.
-// @description				Ответ без ошибки — JSON с полем `data`, ошибка — JSON с полем `description`; суть результата передаёт HTTP-статус.
+// @description				Успешный ответ — сам объект (списки — `items` и `total`/`limit`/`offset`), без обёртки; ошибка — JSON с полем `description`. Суть результата передаёт HTTP-статус.
 // @description				Вход: `POST /auth/login`, затем кнопка Authorize и значение `Bearer <token>`.
 // @BasePath					/api/v1
 // @securityDefinitions.apikey	BearerAuth

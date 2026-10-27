@@ -42,7 +42,7 @@ type ListAuditResponse struct {
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			actor_id	query		int		false	"Only this user's actions"
-//	@Param			entity_type	query		string	false	"Only this entity type"	Enums(user, department, subscription, assignment, request)
+//	@Param			entity_type	query		string	false	"Only this entity type"	Enums(user, department, subscription, assignment, request, transaction, settings, currency)
 //	@Param			entity_id	query		int		false	"Only this entity (with entity_type)"
 //	@Param			action		query		string	false	"Only this action"
 //	@Param			from		query		string	false	"From this day (YYYY-MM-DD), inclusive"
