@@ -5,8 +5,8 @@
 платежах и окончании, аналитика расходов и рекомендации по экономии.
 Полное описание — в [task.md](task.md).
 
-Этот репозиторий — серверная часть: REST API на Go (gorilla/mux, pgx, slog),
-PostgreSQL.
+Сервер — REST API на Go (gorilla/mux, pgx, slog), PostgreSQL. Веб-клиент —
+React + TypeScript + Ant Design в папке `web/` (раздел «Веб-клиент»).
 
 ## Структура
 
@@ -38,6 +38,7 @@ internal/
   <домен>/           store.go → service.go → handler.go → routes.go
 migrations/          SQL-миграции NNNN_name/{up,down}.sql (применяются вручную)
 docs/                OpenAPI-спецификация, генерируется `make swagger`
+web/                 веб-клиент (Vite, React, Ant Design)
 ```
 
 ## Запуск локально
@@ -505,6 +506,36 @@ curl -s localhost:8080/api/v1/requests/1/approve -H "Authorization: Bearer $TOKE
 curl -s localhost:8080/api/v1/currencies -H "Authorization: Bearer $TOKEN" \
   -d '{"code":"USD","name":"Доллар США","rate_to_rub":"92.5"}'
 ```
+
+## Веб-клиент
+
+React 19 + TypeScript, сборка Vite, интерфейс на Ant Design (тёмная тема),
+React Router, TanStack Query. План страниц и решения — в
+[CLIENT_PLAN.md](CLIENT_PLAN.md).
+
+Нужен Node.js 24 LTS. Если `node` не в `PATH` (например, Node распакован в
+`~/.local/node`), `make` найдёт его по переменной `NODE_BIN`.
+
+```sh
+make web-install   # npm ci: зависимости в web/node_modules
+make web-dev       # dev-сервер Vite: http://localhost:5173
+make web-build     # проверка типов и сборка в web/dist
+```
+
+Для разработки одновременно запущены Go-сервер (`make run`, порт 8080) и
+`make web-dev`. Vite проксирует `/api` и `/healthz` на `localhost:8080`, поэтому
+клиент обращается к API по относительному адресу `/api/v1`, без CORS. Для
+демо сервер удобно запускать с `SCHEDULER_INTERVAL=1m`.
+
+- Вход — `/login`. В dev-режиме под формой есть кнопки демо-аккаунтов из
+  `make seed` (начальник `ivanov@company.ru`, сотрудник `popov@company.ru`;
+  у админа кнопка подставляет только email — пароль из `.env`).
+- Токен хранится в `sessionStorage`: переживает перезагрузку, а у каждой
+  вкладки своя сессия, поэтому три роли можно открыть в трёх вкладках.
+- Ответ 401 на любой запрос (токен истёк, пользователя заблокировали)
+  возвращает на вход, после входа — обратно на ту же страницу.
+- Меню сверху своё у каждой роли; чужой раздел по прямой ссылке — «Нет
+  доступа».
 
 ## Разработка
 

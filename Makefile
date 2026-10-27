@@ -1,4 +1,4 @@
-.PHONY: install.dep lint vet test build run clean swagger seed
+.PHONY: install.dep lint vet test build run clean swagger seed web-install web-dev web-build
 
 PROJECTNAME ?= subtrack
 PROJECT_VERSION ?= 0.0.0
@@ -46,3 +46,18 @@ SWAG ?= go run github.com/swaggo/swag/cmd/swag@v1.16.6
 swagger:
 	$(SWAG) fmt -g cmd/server/main.go
 	$(SWAG) init -g cmd/server/main.go -o docs --parseInternal --outputTypes go,json,yaml
+
+# Web client (web/). NODE_BIN is prepended to PATH for the case when Node is
+# unpacked outside PATH, e.g. ~/.local/node.
+NODE_BIN ?= $(HOME)/.local/node/bin
+WEB_ENV = PATH="$(NODE_BIN):$$PATH"
+
+web-install:
+	cd web && $(WEB_ENV) npm ci
+
+# Vite on :5173, proxies /api to the server on :8080 (see web/vite.config.ts).
+web-dev:
+	cd web && $(WEB_ENV) npm run dev
+
+web-build:
+	cd web && $(WEB_ENV) npm run build

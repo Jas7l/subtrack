@@ -1,0 +1,179 @@
+html,
+body {
+  margin: 0;
+  background: #1e1f22;
+  color: #dbdee1;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Layout: header with the top menu, then the page. */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 32px;
+  background: #2b2d31;
+  border-bottom: 1px solid #1e1f22;
+}
+
+.app-menu {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-bottom: 0;
+  gap: 4px;
+}
+
+.app-main {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 36px 32px 56px;
+}
+
+.app-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.app-user:hover {
+  background: #383a40;
+}
+
+.app-user-name {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #f2f3f5;
+}
+
+.app-user-role {
+  font-size: 12px;
+  line-height: 1.3;
+  color: #949ba4;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #f2f3f5;
+}
+
+.page-subtitle {
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: #949ba4;
+}
+
+/* Login: about the product on the left, the form on the right. */
+.login {
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 100vh;
+}
+
+.login-about {
+  flex: 1 1 520px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 48px;
+  padding: 64px 56px;
+  background: #2b2d31;
+}
+
+.login-about h1 {
+  margin: 0;
+  max-width: 520px;
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #f2f3f5;
+}
+
+.login-feature {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  max-width: 520px;
+}
+
+.login-feature p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.55;
+  color: #b5bac1;
+}
+
+.login-feature b {
+  color: #f2f3f5;
+}
+
+.icon-soft {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(163, 230, 53, 0.14);
+  color: #a3e635;
+  font-size: 20px;
+}
+
+.login-form-side {
+  flex: 1 1 520px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-form h2 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  font-weight: 800;
+  color: #f2f3f5;
+}
+
+.login-form .ant-input-affix-wrapper,
+.login-form .ant-input {
+  background: #2b2d31;
+  border-color: #2b2d31;
+}
+
+.full-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
