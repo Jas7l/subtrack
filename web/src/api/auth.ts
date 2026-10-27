@@ -6,4 +6,9 @@ export const authApi = {
     request<LoginResponse>('/auth/login', { method: 'POST', body: { email, password } }),
   me: () => request<MeDTO>('/auth/me'),
   department: (id: number) => request<DepartmentDTO>(`/departments/${id}`),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<void>('/auth/password', {
+      method: 'POST',
+      body: { current_password: currentPassword, new_password: newPassword },
+    }),
 }

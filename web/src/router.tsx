@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import { Navigate, Outlet, createBrowserRouter } from 'react-router'
 import type { Role } from './api/types'
 import { AuthProvider, useMe } from './auth/AuthContext'
@@ -6,7 +7,12 @@ import { RequireRole } from './auth/RequireRole'
 import { AppLayout } from './layout/AppLayout'
 import { homePath } from './lib/roles'
 import { LoginPage } from './pages/LoginPage'
+import { MyRequestsPage } from './pages/MyRequestsPage'
+import { MySubscriptionsPage } from './pages/MySubscriptionsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { NotificationsPage } from './pages/NotificationsPage'
+import { ProfilePage } from './pages/ProfilePage'
+import { RequestPage } from './pages/RequestPage'
 import { StubPage } from './pages/StubPage'
 
 const ALL: readonly Role[] = ['admin', 'manager', 'employee']
@@ -14,21 +20,34 @@ const STAFF: readonly Role[] = ['manager', 'employee']
 const BOSSES: readonly Role[] = ['admin', 'manager']
 const ADMIN: readonly Role[] = ['admin']
 
-// Pages of the app and who may open them. Until a page is built it is a stub
-// that names the stage it belongs to (CLIENT_PLAN.md, section 7).
+// Pages of the app and who may open them. Until a page is built (no `Page`)
+// it is a stub that names the stage it belongs to (CLIENT_PLAN.md, section 7).
 interface PageDef {
   path: string
   roles: readonly Role[]
   title: string | Partial<Record<Role, string>>
   stage: string
+  Page?: ComponentType
 }
 
 const pages: PageDef[] = [
-  { path: '/my/subscriptions', roles: STAFF, title: 'Мои подписки', stage: 'К2' },
-  { path: '/my/requests', roles: STAFF, title: 'Мои заявки', stage: 'К2' },
-  { path: '/requests/:id', roles: ALL, title: 'Заявка', stage: 'К2' },
-  { path: '/notifications', roles: ALL, title: 'Уведомления', stage: 'К2' },
-  { path: '/profile', roles: ALL, title: 'Профиль', stage: 'К2' },
+  {
+    path: '/my/subscriptions',
+    roles: STAFF,
+    title: 'Мои подписки',
+    stage: 'К2',
+    Page: MySubscriptionsPage,
+  },
+  { path: '/my/requests', roles: STAFF, title: 'Мои заявки', stage: 'К2', Page: MyRequestsPage },
+  { path: '/requests/:id', roles: ALL, title: 'Заявка', stage: 'К2', Page: RequestPage },
+  {
+    path: '/notifications',
+    roles: ALL,
+    title: 'Уведомления',
+    stage: 'К2',
+    Page: NotificationsPage,
+  },
+  { path: '/profile', roles: ALL, title: 'Профиль', stage: 'К2', Page: ProfilePage },
   {
     path: '/dashboard',
     roles: BOSSES,
@@ -100,7 +119,7 @@ export const router = createBrowserRouter([
             path: page.path,
             element: (
               <RequireRole roles={page.roles}>
-                <Stub page={page} />
+                {page.Page ? <page.Page /> : <Stub page={page} />}
               </RequireRole>
             ),
           })),

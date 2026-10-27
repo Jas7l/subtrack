@@ -1,10 +1,10 @@
-import { BellOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons'
-import { Badge, Button, Dropdown, Menu, type MenuProps } from 'antd'
+import { LogoutOutlined, UserOutlined } from '@ant-design/icons'
+import { Badge, Dropdown, Menu, type MenuProps } from 'antd'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
-import { useLatestNotifications } from '../api/notifications'
 import { usePendingRequestsCount } from '../api/requests'
 import { useAuth, useMe } from '../auth/AuthContext'
 import { Logo } from '../components/Logo'
+import { NotificationBell } from '../components/NotificationBell'
 import { UserAvatar } from '../components/UserAvatar'
 import { roleLabels } from '../lib/labels'
 import { homePath, isGroup, navByRole, type NavLeaf } from '../lib/roles'
@@ -29,7 +29,6 @@ export function AppLayout() {
   const pendingStatus =
     me.role === 'admin' ? 'pending_admin' : me.role === 'manager' && isHead ? 'pending_manager' : null
   const pending = usePendingRequestsCount(pendingStatus)
-  const notifications = useLatestNotifications()
 
   const nav = navByRole[me.role]
   const leaves = nav.flatMap((item) => (isGroup(item) ? item.children : [item]))
@@ -66,7 +65,6 @@ export function AppLayout() {
   ]
 
   const subtitle = [roleLabels[me.role], department?.name].filter(Boolean).join(' · ')
-  const unread = notifications.data?.unread ?? 0
 
   return (
     <>
@@ -80,14 +78,7 @@ export function AppLayout() {
           items={menuItems}
           selectedKeys={current ? [current] : []}
         />
-        <Badge count={unread} size="small" offset={[-6, 6]}>
-          <Button
-            aria-label={unread ? `Уведомления: ${unread} новых` : 'Уведомления'}
-            icon={<BellOutlined style={{ fontSize: 18 }} />}
-            style={{ width: 44, background: '#383A40', borderColor: '#383A40' }}
-            onClick={() => navigate('/notifications')}
-          />
-        </Badge>
+        <NotificationBell />
         <Dropdown menu={{ items: userMenu }} trigger={['click']} placement="bottomRight">
           <div className="app-user" role="button" tabIndex={0} aria-label="Меню профиля">
             <UserAvatar id={me.id} name={me.full_name} />

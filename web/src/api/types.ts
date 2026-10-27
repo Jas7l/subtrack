@@ -81,3 +81,97 @@ export interface NotificationDTO {
 export interface NotificationPage extends Page<NotificationDTO> {
   unread: number
 }
+
+export type SubscriptionType = 'individual' | 'group' | 'enterprise'
+export type SubscriptionStatus = 'active' | 'expiring_soon' | 'expired' | 'cancelled'
+export type BillingPeriod = 'month' | 'quarter' | 'year'
+
+export interface SubscriptionDTO {
+  id: number
+  name: string
+  vendor: string
+  category: string
+  type: SubscriptionType
+  cost: string
+  currency: string
+  billing_period: BillingPeriod
+  start_date: string
+  end_date: string | null
+  next_payment_date: string | null
+  status: SubscriptionStatus
+  // null: a company-wide subscription.
+  department_id: number | null
+  department_name: string | null
+  // null for enterprise (no seat limit).
+  seats_total: number | null
+  seats_used: number
+  seats_free: number | null
+  created_by: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type AssignmentStatus = 'active' | 'revoked'
+
+export interface AssignmentDTO {
+  id: number
+  subscription_id: number
+  subscription_name: string
+  user_id: number
+  user_name: string
+  status: AssignmentStatus
+  assigned_by: number | null
+  assigned_at: string
+  revoked_by: number | null
+  revoked_at: string | null
+}
+
+export type RequestStatus =
+  | 'pending_manager'
+  | 'rejected_by_manager'
+  | 'pending_admin'
+  | 'rejected_by_admin'
+  | 'approved'
+  | 'cancelled'
+
+export interface RequestDTO {
+  id: number
+  requester_id: number
+  requester_name: string
+  department_id: number | null
+  department_name: string | null
+  name: string
+  vendor: string
+  justification: string
+  estimated_cost: string | null
+  currency: string
+  // The subscription the licence was given in, once approved.
+  subscription_id: number | null
+  status: RequestStatus
+  manager_id: number | null
+  manager_name: string | null
+  manager_comment: string
+  manager_decided_at: string | null
+  admin_id: number | null
+  admin_name: string | null
+  admin_comment: string
+  admin_decided_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateRequestBody {
+  name: string
+  vendor?: string
+  justification: string
+  estimated_cost?: string
+  currency?: string
+}
+
+export interface CurrencyDTO {
+  code: string
+  name: string
+  rate_to_rub: string
+  updated_at: string
+  updated_by: number | null
+}

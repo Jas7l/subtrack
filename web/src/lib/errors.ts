@@ -39,6 +39,8 @@ const known: Record<string, string> = {
   'the currency is used by subscriptions, requests or payments and cannot be deleted':
     'Валюта используется в подписках, заявках или платежах — удалить нельзя',
   'bad period': 'Неверный период',
+  'request not found': 'Заявка не найдена',
+  'subscription not found': 'Подписка не найдена',
 }
 
 const byStatus: Record<number, string> = {

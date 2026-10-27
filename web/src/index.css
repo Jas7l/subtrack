@@ -177,3 +177,271 @@ body {
   justify-content: center;
   min-height: 100vh;
 }
+
+.page-spin {
+  display: flex;
+  justify-content: center;
+  padding: 64px 0;
+}
+
+.page-title-id {
+  font-weight: 600;
+  color: #949ba4;
+}
+
+.two-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+/* Status pill: soft background, text and a dot of the status colour. */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.status-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.service-tile {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* My subscriptions: cards. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.sub-card {
+  border: 1px solid transparent;
+}
+
+.sub-card-expiring {
+  border-color: rgba(240, 178, 50, 0.55);
+}
+
+.sub-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sub-card-name {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 800;
+  color: #f2f3f5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-card-vendor {
+  font-size: 13px;
+  color: #949ba4;
+}
+
+.sub-card-facts {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0;
+}
+
+.sub-card-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sub-card-facts dt {
+  color: #949ba4;
+}
+
+.sub-card-facts dd {
+  margin: 0;
+  text-align: right;
+  color: #dbdee1;
+}
+
+.sub-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Tables. */
+.table-clickable .ant-table-row {
+  cursor: pointer;
+}
+
+.cell-service {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cell-title {
+  font-weight: 700;
+  color: #f2f3f5;
+}
+
+.cell-sub {
+  font-size: 13px;
+  color: #949ba4;
+}
+
+/* Request history. */
+.history-title {
+  font-weight: 600;
+  color: #f2f3f5;
+}
+
+.history-when {
+  font-size: 13px;
+  color: #949ba4;
+}
+
+.history-comment {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #313338;
+  color: #dbdee1;
+}
+
+/* Notifications: one row of the list and of the bell popup. */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notice:hover {
+  background: #313338;
+}
+
+.notice-compact {
+  padding: 10px 12px;
+}
+
+.notice-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 18px;
+}
+
+.notice-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notice-title {
+  color: #b5bac1;
+}
+
+.notice-unread .notice-title {
+  font-weight: 700;
+  color: #f2f3f5;
+}
+
+.notice-body {
+  font-size: 14px;
+  color: #949ba4;
+}
+
+.notice-compact .notice-body {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.notice-time {
+  font-size: 12px;
+  color: #6d7480;
+}
+
+.notice-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #a3e635;
+}
+
+.bell-panel {
+  width: 400px;
+  padding: 8px;
+}
+
+.bell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 10px 12px;
+  font-weight: 800;
+  color: #f2f3f5;
+}
+
+.bell-list {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.bell-all {
+  margin-top: 6px;
+}
+
+/* Profile. */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.profile-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: #f2f3f5;
+}
+
+.profile-role {
+  color: #949ba4;
+}
