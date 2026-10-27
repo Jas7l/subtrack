@@ -154,6 +154,13 @@ func (s *Store) List(ctx context.Context, f domain.SubscriptionFilter, sc *domai
 	if f.Query != "" {
 		b.add("(s.name ILIKE ? OR s.vendor ILIKE ?)", "%"+pg.EscapeLike(f.Query)+"%")
 	}
+	if f.FreeSeats != nil {
+		if *f.FreeSeats {
+			b.conds = append(b.conds, "s.seats_used < s.seats_total")
+		} else {
+			b.conds = append(b.conds, "s.seats_used >= s.seats_total")
+		}
+	}
 	where := b.sql()
 
 	var total int64

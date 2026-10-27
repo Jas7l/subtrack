@@ -86,6 +86,8 @@ func TestHTTPSubscriptions(t *testing.T) {
 		{"list filters", admin, "GET", "/subscriptions?status=active&type=group&end_from=2026-06-01&end_to=2027-01-01&category=разработка", "", 200},
 		{"list bad status", admin, "GET", "/subscriptions?status=paused", "", 400},
 		{"list bad date", admin, "GET", "/subscriptions?end_to=tomorrow", "", 400},
+		{"list free seats", admin, "GET", "/subscriptions?free_seats=true", "", 200},
+		{"list bad free seats", admin, "GET", "/subscriptions?free_seats=maybe", "", 400},
 		{"get as manager", mgr, "GET", sub, "", 200},
 		{"get hidden", emp, "GET", sub, "", 404},
 		{"patch as manager", mgr, "PATCH", sub, `{"name":"X"}`, 403},

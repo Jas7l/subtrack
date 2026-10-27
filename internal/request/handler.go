@@ -33,9 +33,11 @@ type RequestDTO struct {
 	SubscriptionID   *int64     `json:"subscription_id" example:"12"`
 	Status           string     `json:"status" example:"pending_manager" enums:"pending_manager,rejected_by_manager,pending_admin,rejected_by_admin,approved,cancelled"`
 	ManagerID        *int64     `json:"manager_id" example:"5"`
+	ManagerName      *string    `json:"manager_name" example:"Иванов Иван Сергеевич"`
 	ManagerComment   string     `json:"manager_comment" example:"Согласовано"`
 	ManagerDecidedAt *time.Time `json:"manager_decided_at" example:"2026-10-23T12:00:00Z"`
 	AdminID          *int64     `json:"admin_id" example:"1"`
+	AdminName        *string    `json:"admin_name" example:"Администратор"`
 	AdminComment     string     `json:"admin_comment" example:""`
 	AdminDecidedAt   *time.Time `json:"admin_decided_at" example:"2026-10-24T09:00:00Z"`
 	CreatedAt        time.Time  `json:"created_at" example:"2026-10-23T10:00:00Z"`
@@ -57,9 +59,11 @@ func toDTO(r domain.Request) RequestDTO {
 		SubscriptionID:   r.SubscriptionID,
 		Status:           string(r.Status),
 		ManagerID:        r.ManagerID,
+		ManagerName:      r.ManagerName,
 		ManagerComment:   r.ManagerComment,
 		ManagerDecidedAt: r.ManagerDecidedAt,
 		AdminID:          r.AdminID,
+		AdminName:        r.AdminName,
 		AdminComment:     r.AdminComment,
 		AdminDecidedAt:   r.AdminDecidedAt,
 		CreatedAt:        r.CreatedAt,

@@ -31,6 +31,7 @@ var (
 //	@Param			end_from		query		string	false	"end_date from, inclusive (YYYY-MM-DD)"
 //	@Param			end_to			query		string	false	"end_date to, inclusive (YYYY-MM-DD)"
 //	@Param			q				query		string	false	"Substring of name or vendor"
+//	@Param			free_seats		query		bool	false	"true: seats left over; false: every seat taken"
 //	@Success		200				{file}		file
 //	@Failure		400				{object}	httpx.ErrorBody
 //	@Failure		401				{object}	httpx.ErrorBody

@@ -129,6 +129,7 @@ type ListSubscriptionsResponse struct {
 //	@Param			end_from		query		string	false	"end_date on or after (YYYY-MM-DD)"
 //	@Param			end_to			query		string	false	"end_date on or before (YYYY-MM-DD)"
 //	@Param			q				query		string	false	"Substring of the name or vendor"
+//	@Param			free_seats		query		bool	false	"true: a seat limit with seats left over (unused seats); false: every seat taken. Enterprise matches neither"
 //	@Param			limit			query		int		false	"Page size (default 50, max 200)"
 //	@Param			offset			query		int		false	"Page offset"
 //	@Success		200				{object}	ListSubscriptionsResponse
@@ -357,6 +358,13 @@ func parseFilter(r *http.Request) (domain.SubscriptionFilter, error) {
 	}
 	if f.EndTo, err = httpx.QueryDate(q, "end_to"); err != nil {
 		return f, err
+	}
+	if v := q.Get("free_seats"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return f, fmt.Errorf("%w: free_seats must be true or false", apperr.ErrInvalidInput)
+		}
+		f.FreeSeats = &b
 	}
 	return f, nil
 }

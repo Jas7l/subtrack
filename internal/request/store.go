@@ -29,24 +29,26 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
-// selectRequest reads a request with the requester's and the department's
-// names, in the order scanRequest expects.
+// selectRequest reads a request with the names of the requester, the
+// department and whoever decided it, in the order scanRequest expects.
 const selectRequest = `
 	SELECT r.id, r.requester_id, u.full_name, r.department_id, d.name, r.name, r.vendor, r.justification,
 	       r.estimated_cost::text, r.currency, r.subscription_id, r.status,
-	       r.manager_id, r.manager_comment, r.manager_decided_at,
-	       r.admin_id, r.admin_comment, r.admin_decided_at, r.created_at, r.updated_at
+	       r.manager_id, m.full_name, r.manager_comment, r.manager_decided_at,
+	       r.admin_id, a.full_name, r.admin_comment, r.admin_decided_at, r.created_at, r.updated_at
 	FROM subtrack.requests r
 	JOIN subtrack.users u ON u.id = r.requester_id
-	LEFT JOIN subtrack.departments d ON d.id = r.department_id`
+	LEFT JOIN subtrack.departments d ON d.id = r.department_id
+	LEFT JOIN subtrack.users m ON m.id = r.manager_id
+	LEFT JOIN subtrack.users a ON a.id = r.admin_id`
 
 func scanRequest(row pgx.Row) (domain.Request, error) {
 	var r domain.Request
 	var status string
 	err := row.Scan(&r.ID, &r.RequesterID, &r.RequesterName, &r.DepartmentID, &r.DepartmentName,
 		&r.Name, &r.Vendor, &r.Justification, &r.EstimatedCost, &r.Currency, &r.SubscriptionID, &status,
-		&r.ManagerID, &r.ManagerComment, &r.ManagerDecidedAt,
-		&r.AdminID, &r.AdminComment, &r.AdminDecidedAt, &r.CreatedAt, &r.UpdatedAt)
+		&r.ManagerID, &r.ManagerName, &r.ManagerComment, &r.ManagerDecidedAt,
+		&r.AdminID, &r.AdminName, &r.AdminComment, &r.AdminDecidedAt, &r.CreatedAt, &r.UpdatedAt)
 	r.Status = domain.RequestStatus(status)
 	return r, err
 }

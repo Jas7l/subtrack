@@ -63,9 +63,12 @@ type Request struct {
 	AdminID          *int64
 	AdminComment     string
 	AdminDecidedAt   *time.Time
-	// RequesterName and DepartmentName are read-only, filled in by reads.
+	// RequesterName, DepartmentName, ManagerName and AdminName are
+	// read-only, filled in by reads.
 	RequesterName  string
 	DepartmentName *string
+	ManagerName    *string
+	AdminName      *string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }

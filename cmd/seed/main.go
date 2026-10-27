@@ -508,7 +508,7 @@ func main() {
 		admin.call(http.MethodPatch, fmt.Sprintf("/users/%d", userIDs[email]), map[string]any{"is_active": false}, nil)
 	}
 
-	log.Printf("done: %d departments, %d users, %d subscriptions, %d payments, 8 requests",
+	log.Printf("done: %d departments, %d users, %d subscriptions, %d payments, 9 requests",
 		len(departments), len(users), len(subscriptions)+2, payments)
 	log.Printf("every demo user signs in with password %q, e.g. ivanov@company.ru (manager), smirnov@company.ru (employee)", *userPassword)
 }

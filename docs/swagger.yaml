@@ -657,6 +657,9 @@ definitions:
       admin_id:
         example: 1
         type: integer
+      admin_name:
+        example: Администратор
+        type: string
       created_at:
         example: "2026-10-23T10:00:00Z"
         type: string
@@ -687,6 +690,9 @@ definitions:
       manager_id:
         example: 5
         type: integer
+      manager_name:
+        example: Иванов Иван Сергеевич
+        type: string
       name:
         example: Figma
         type: string
@@ -2815,6 +2821,11 @@ paths:
         in: query
         name: q
         type: string
+      - description: 'true: a seat limit with seats left over (unused seats); false:
+          every seat taken. Enterprise matches neither'
+        in: query
+        name: free_seats
+        type: boolean
       - description: Page size (default 50, max 200)
         in: query
         name: limit
@@ -3051,6 +3062,10 @@ paths:
         in: query
         name: q
         type: string
+      - description: 'true: seats left over; false: every seat taken'
+        in: query
+        name: free_seats
+        type: boolean
       produces:
       - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       responses:

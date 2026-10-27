@@ -2445,6 +2445,12 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "type": "boolean",
+                        "description": "true: a seat limit with seats left over (unused seats); false: every seat taken. Enterprise matches neither",
+                        "name": "free_seats",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "description": "Page size (default 50, max 200)",
                         "name": "limit",
@@ -2602,6 +2608,12 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Substring of name or vendor",
                         "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "true: seats left over; false: every seat taken",
+                        "name": "free_seats",
                         "in": "query"
                     }
                 ],
@@ -4569,6 +4581,10 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 1
                 },
+                "admin_name": {
+                    "type": "string",
+                    "example": "Администратор"
+                },
                 "created_at": {
                     "type": "string",
                     "example": "2026-10-23T10:00:00Z"
@@ -4608,6 +4624,10 @@ const docTemplate = `{
                 "manager_id": {
                     "type": "integer",
                     "example": 5
+                },
+                "manager_name": {
+                    "type": "string",
+                    "example": "Иванов Иван Сергеевич"
                 },
                 "name": {
                     "type": "string",

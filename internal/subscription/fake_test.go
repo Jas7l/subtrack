@@ -81,6 +81,7 @@ func (f *fakeRepo) List(_ context.Context, flt domain.SubscriptionFilter, sc *do
 		case flt.EndFrom != nil && (s.EndDate == nil || s.EndDate.Before(*flt.EndFrom)):
 		case flt.EndTo != nil && (s.EndDate == nil || s.EndDate.After(*flt.EndTo)):
 		case flt.Query != "" && !strings.Contains(strings.ToLower(s.Name+" "+s.Vendor), strings.ToLower(flt.Query)):
+		case flt.FreeSeats != nil && (s.SeatsTotal == nil || (s.SeatsUsed < *s.SeatsTotal) != *flt.FreeSeats):
 		default:
 			out = append(out, s)
 		}

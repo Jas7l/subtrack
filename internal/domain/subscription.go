@@ -136,6 +136,10 @@ type SubscriptionFilter struct {
 	EndTo   *time.Time
 	// Query matches a substring of the name or the vendor, case-insensitively.
 	Query string
+	// FreeSeats true keeps the subscriptions with a seat limit and seats
+	// left over; false keeps the ones with every seat taken. Enterprise
+	// subscriptions have no limit and match neither.
+	FreeSeats *bool
 }
 
 // SubscriptionScope limits what a caller may see: the subscriptions of

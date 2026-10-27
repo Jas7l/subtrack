@@ -176,7 +176,7 @@ curl -s localhost:8080/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
 
 | Метод | Путь | Доступ | Что делает |
 |---|---|---|---|
-| GET | `/api/v1/subscriptions` | все | список; фильтры `department_id`, `category`, `status`, `type`, `end_from`, `end_to`, `q` |
+| GET | `/api/v1/subscriptions` | все | список; фильтры `department_id`, `category`, `status`, `type`, `end_from`, `end_to`, `q`, `free_seats` (`true` — есть свободные места, `false` — всё занято; enterprise не попадает никуда) |
 | GET | `/api/v1/subscriptions/{id}` | все | одна подписка, если она в зоне видимости |
 | POST | `/api/v1/subscriptions` | админ | создать |
 | PATCH | `/api/v1/subscriptions/{id}` | админ | изменить, в том числе отменить (`"status": "cancelled"`) |
@@ -430,7 +430,7 @@ curl -s localhost:8080/api/v1/requests/1/approve -H "Authorization: Bearer $TOKE
 
 | Путь | Что в файле |
 |---|---|
-| `GET /api/v1/subscriptions/export` | все подписки; те же фильтры, что у списка (`status`, `type`, `department_id`, `category`, `end_from`, `end_to`, `q`) |
+| `GET /api/v1/subscriptions/export` | все подписки; те же фильтры, что у списка (`status`, `type`, `department_id`, `category`, `end_from`, `end_to`, `q`, `free_seats`) |
 | `GET /api/v1/transactions/export` | все платежи; фильтры `status`, `subscription_id`, `from`, `to`, `order` |
 | `GET /api/v1/analytics/export` | книга: «Сводка», «Категории», «Вендоры», «Отделы» (если без `department_id`), «Самые дорогие» (20), «Оплачено по месяцам» (12), «Прогноз» (12), «Рекомендации», «Курсы» (по каким курсам пересчитаны суммы) |
 
