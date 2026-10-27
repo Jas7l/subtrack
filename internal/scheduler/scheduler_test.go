@@ -214,6 +214,13 @@ func TestRunOnce(t *testing.T) {
 	if body := f.notify.sent[4].Body; !strings.Contains(body, "25.10.2026 (через 2 дня), сумма 1500.00 RUB") {
 		t.Errorf("payment body = %q", body)
 	}
+	// Every event links to its subscription: Jira expiring (3 copies),
+	// Figma expired, then the payment of subscription 3.
+	for i, want := range []int64{1, 1, 1, 2, 3} {
+		if n := f.notify.sent[i]; n.EntityType != domain.EntitySubscription || n.EntityID != want {
+			t.Errorf("sent[%d] %s links to %s %d, want subscription %d", i, n.Type, n.EntityType, n.EntityID, want)
+		}
+	}
 
 	if len(f.audit.Entries) != 2 {
 		t.Fatalf("audit = %+v, want 2 entries", f.audit.Entries)

@@ -524,6 +524,20 @@ definitions:
       created_at:
         example: "2026-10-23T10:00:00Z"
         type: string
+      entity_id:
+        example: 12
+        type: integer
+      entity_type:
+        description: |-
+          EntityType and EntityID name the record the notification is about;
+          both are null when it points nowhere (notifications stored before
+          migration 0011).
+        enum:
+        - request
+        - subscription
+        - transaction
+        example: request
+        type: string
       id:
         example: 88
         type: integer

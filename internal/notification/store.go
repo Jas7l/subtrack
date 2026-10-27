@@ -23,15 +23,16 @@ func NewStore(pool *pgxpool.Pool) *Store {
 }
 
 // Send stores one notification for n.UserID. ID, IsRead and CreatedAt are
-// ignored.
+// ignored; an empty EntityType stores no entity.
 //
 // Errors:
 //   - wrapped storage.ErrNotFound when the user does not exist.
 //   - any other db error wrapped as "postgres: send notification: ...".
 func (s *Store) Send(ctx context.Context, n domain.Notification) error {
 	_, err := pg.Conn(ctx, s.pool).Exec(ctx, `
-		INSERT INTO subtrack.notifications (user_id, type, title, body) VALUES ($1, $2, $3, $4)`,
-		n.UserID, string(n.Type), n.Title, n.Body)
+		INSERT INTO subtrack.notifications (user_id, type, title, body, entity_type, entity_id)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''), NULLIF($6, 0))`,
+		n.UserID, string(n.Type), n.Title, n.Body, string(n.EntityType), entityID(n))
 	return pg.Translate(ctx, "send notification", err)
 }
 
@@ -42,10 +43,19 @@ func (s *Store) Send(ctx context.Context, n domain.Notification) error {
 //   - any db error wrapped as "postgres: send notification to admins: ...".
 func (s *Store) SendToAdmins(ctx context.Context, n domain.Notification) error {
 	_, err := pg.Conn(ctx, s.pool).Exec(ctx, `
-		INSERT INTO subtrack.notifications (user_id, type, title, body)
-		SELECT id, $1, $2, $3 FROM subtrack.users WHERE role = 'admin' AND is_active`,
-		string(n.Type), n.Title, n.Body)
+		INSERT INTO subtrack.notifications (user_id, type, title, body, entity_type, entity_id)
+		SELECT id, $1, $2, $3, NULLIF($4, ''), NULLIF($5, 0) FROM subtrack.users WHERE role = 'admin' AND is_active`,
+		string(n.Type), n.Title, n.Body, string(n.EntityType), entityID(n))
 	return pg.Translate(ctx, "send notification to admins", err)
+}
+
+// entityID is n.EntityID, or 0 (stored as NULL) when n points nowhere, so
+// the two columns are always set together.
+func entityID(n domain.Notification) int64 {
+	if n.EntityType == "" {
+		return 0
+	}
+	return n.EntityID
 }
 
 // List returns one page of userID's notifications, newest first, plus the
@@ -63,7 +73,7 @@ func (s *Store) List(ctx context.Context, userID int64, unreadOnly bool, limit, 
 		return nil, 0, 0, pg.Translate(ctx, "count notifications", err)
 	}
 	rows, err := db.Query(ctx, `
-		SELECT id, user_id, type, title, body, is_read, created_at
+		SELECT id, user_id, type, title, body, entity_type, entity_id, is_read, created_at
 		FROM subtrack.notifications
 		WHERE user_id = $1 AND (NOT $2::bool OR NOT is_read)
 		ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4`, userID, unreadOnly, limit, offset)
@@ -89,8 +99,14 @@ func (s *Store) List(ctx context.Context, userID int64, unreadOnly bool, limit, 
 func scanNotification(row pgx.Row) (domain.Notification, error) {
 	var n domain.Notification
 	var typ string
-	err := row.Scan(&n.ID, &n.UserID, &typ, &n.Title, &n.Body, &n.IsRead, &n.CreatedAt)
+	var entityType *string
+	var entityID *int64
+	err := row.Scan(&n.ID, &n.UserID, &typ, &n.Title, &n.Body, &entityType, &entityID, &n.IsRead, &n.CreatedAt)
 	n.Type = domain.NotificationType(typ)
+	if entityType != nil && entityID != nil {
+		n.EntityType = domain.NotificationEntity(*entityType)
+		n.EntityID = *entityID
+	}
 	return n, err
 }
 
@@ -104,7 +120,7 @@ func (s *Store) MarkRead(ctx context.Context, userID, id int64) (domain.Notifica
 	n, err := scanNotification(pg.Conn(ctx, s.pool).QueryRow(ctx, `
 		UPDATE subtrack.notifications SET is_read = TRUE
 		WHERE id = $1 AND user_id = $2
-		RETURNING id, user_id, type, title, body, is_read, created_at`, id, userID))
+		RETURNING id, user_id, type, title, body, entity_type, entity_id, is_read, created_at`, id, userID))
 	if err != nil {
 		return domain.Notification{}, pg.Translate(ctx, "mark notification read", err)
 	}

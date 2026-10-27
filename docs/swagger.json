@@ -4393,6 +4393,20 @@
                     "type": "string",
                     "example": "2026-10-23T10:00:00Z"
                 },
+                "entity_id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "entity_type": {
+                    "description": "EntityType and EntityID name the record the notification is about;\nboth are null when it points nowhere (notifications stored before\nmigration 0011).",
+                    "type": "string",
+                    "enum": [
+                        "request",
+                        "subscription",
+                        "transaction"
+                    ],
+                    "example": "request"
+                },
                 "id": {
                     "type": "integer",
                     "example": 88

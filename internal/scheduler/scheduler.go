@@ -258,6 +258,8 @@ func (s *Scheduler) send(ctx context.Context, sub domain.Subscription, e event, 
 			Title: "Подписка скоро закончится: " + sub.Name,
 			Body: "Подписка «" + sub.Name + "» действует до " + sub.EndDate.Format(dateLayout) +
 				" включительно — это " + inDays(daysUntil(today, *sub.EndDate)) + ".",
+			EntityType: domain.EntitySubscription,
+			EntityID:   sub.ID,
 		}
 		holders, err := s.repo.Holders(ctx, sub.ID)
 		if err != nil {
@@ -276,6 +278,8 @@ func (s *Scheduler) send(ctx context.Context, sub domain.Subscription, e event, 
 			Title: "Подписка закончилась: " + sub.Name,
 			Body: "Срок подписки «" + sub.Name + "» истёк " + sub.EndDate.Format(dateLayout) +
 				", статус изменён на «истекла». Продлите её или отмените.",
+			EntityType: domain.EntitySubscription,
+			EntityID:   sub.ID,
 		})
 	case evPayment:
 		return s.notify.SendToAdmins(ctx, domain.Notification{
@@ -283,6 +287,10 @@ func (s *Scheduler) send(ctx context.Context, sub domain.Subscription, e event, 
 			Title: "Скоро платёж: " + sub.Name,
 			Body: "Платёж по подписке «" + sub.Name + "» — " + e.next.Format(dateLayout) +
 				" (" + inDays(daysUntil(today, e.next)) + "), сумма " + sub.Cost + " " + sub.Currency + ".",
+			// The payment is not recorded yet, so the link leads to the
+			// subscription.
+			EntityType: domain.EntitySubscription,
+			EntityID:   sub.ID,
 		})
 	}
 	return nil

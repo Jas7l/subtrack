@@ -18,13 +18,26 @@ const (
 	NotifyRequestRejected NotificationType = "request_rejected"
 )
 
-// Notification is an in-app message to one user.
+// NotificationEntity is the kind of record a notification points at. The
+// set mirrors the CHECK constraint on notifications.entity_type.
+type NotificationEntity string
+
+const (
+	EntityRequest      NotificationEntity = "request"
+	EntitySubscription NotificationEntity = "subscription"
+	EntityTransaction  NotificationEntity = "transaction"
+)
+
+// Notification is an in-app message to one user. EntityType and EntityID
+// name the record it is about; both are zero when it points nowhere.
 type Notification struct {
-	ID        int64
-	UserID    int64
-	Type      NotificationType
-	Title     string
-	Body      string
-	IsRead    bool
-	CreatedAt time.Time
+	ID         int64
+	UserID     int64
+	Type       NotificationType
+	Title      string
+	Body       string
+	EntityType NotificationEntity
+	EntityID   int64
+	IsRead     bool
+	CreatedAt  time.Time
 }

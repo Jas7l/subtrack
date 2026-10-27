@@ -320,6 +320,11 @@ func TestFullApprovalNewSubscription(t *testing.T) {
 	if got := strings.Join(f.notify.to(), ","); got != wantTo {
 		t.Errorf("notifications:\n got %s\nwant %s", got, wantTo)
 	}
+	for _, n := range f.notify.sent {
+		if n.EntityType != domain.EntityRequest || n.EntityID != r.ID {
+			t.Errorf("%s links to %s %d, want request %d", n.Type, n.EntityType, n.EntityID, r.ID)
+		}
+	}
 	wantAudit := "request.create,request.approve,request.approve"
 	if got := strings.Join(f.audit.Actions(), ","); got != wantAudit {
 		t.Errorf("audit: got %s, want %s", got, wantAudit)

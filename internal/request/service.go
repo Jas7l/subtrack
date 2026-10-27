@@ -380,10 +380,12 @@ func (s *Service) decideAsManager(ctx context.Context, actor domain.User, id int
 		return domain.Request{}, err
 	}
 	n := domain.Notification{
-		UserID: out.RequesterID,
-		Type:   domain.NotifyRequestRejected,
-		Title:  "Заявка отклонена: " + out.Name,
-		Body:   withComment("Начальник отдела отклонил заявку.", v.Comment),
+		UserID:     out.RequesterID,
+		Type:       domain.NotifyRequestRejected,
+		Title:      "Заявка отклонена: " + out.Name,
+		Body:       withComment("Начальник отдела отклонил заявку.", v.Comment),
+		EntityType: domain.EntityRequest,
+		EntityID:   out.ID,
 	}
 	if v.Approve {
 		n.Type = domain.NotifyRequestApproved
@@ -422,10 +424,12 @@ func (s *Service) decideAsAdmin(ctx context.Context, actor domain.User, id int64
 
 	d := domain.Decision{ReviewerID: actor.ID, Approve: v.Approve, Comment: v.Comment}
 	n := domain.Notification{
-		UserID: r.RequesterID,
-		Type:   domain.NotifyRequestRejected,
-		Title:  "Заявка отклонена: " + r.Name,
-		Body:   withComment("Администратор отклонил заявку.", v.Comment),
+		UserID:     r.RequesterID,
+		Type:       domain.NotifyRequestRejected,
+		Title:      "Заявка отклонена: " + r.Name,
+		Body:       withComment("Администратор отклонил заявку.", v.Comment),
+		EntityType: domain.EntityRequest,
+		EntityID:   r.ID,
 	}
 	if v.Approve {
 		a, err := s.grant(ctx, actor, r, v)
@@ -468,9 +472,11 @@ func (s *Service) recordDecision(ctx context.Context, actor domain.User, r domai
 // it is at pending_manager, every active admin when it is at pending_admin.
 func (s *Service) notifyReviewer(ctx context.Context, r domain.Request, head *int64) error {
 	n := domain.Notification{
-		Type:  domain.NotifyRequestCreated,
-		Title: "Новая заявка: " + r.Name,
-		Body:  r.RequesterName + " просит «" + r.Name + "». Обоснование: " + r.Justification,
+		Type:       domain.NotifyRequestCreated,
+		Title:      "Новая заявка: " + r.Name,
+		Body:       r.RequesterName + " просит «" + r.Name + "». Обоснование: " + r.Justification,
+		EntityType: domain.EntityRequest,
+		EntityID:   r.ID,
 	}
 	if r.Status == domain.ReqPendingManager && head != nil {
 		n.UserID = *head

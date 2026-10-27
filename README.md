@@ -70,6 +70,7 @@ docs/                OpenAPI-спецификация, генерируется 
    | 0008_department_heads_and_case | один начальник — максимум один отдел; регистронезависимость для кириллицы (`pg_c_utf8`) |
    | 0009_subscriptions_case | регистронезависимый поиск по названию, вендору и категории подписки (`pg_c_utf8`) |
    | 0010_notification_settings | `notification_settings` (одна строка: за сколько дней предупреждать) |
+   | 0011_notification_entity | `notifications.entity_type`, `entity_id`: на что ссылается уведомление |
 
 3. Настроить подключение и запустить:
 
@@ -294,6 +295,18 @@ curl -s localhost:8080/api/v1/requests/1/approve -H "Authorization: Bearer $TOKE
 | GET | `/api/v1/notifications` | все | свои уведомления, новые сверху; `?unread=true` — только непрочитанные; в ответе `unread` — сколько непрочитанных всего |
 | POST | `/api/v1/notifications/{id}/read` | все | отметить прочитанным |
 | POST | `/api/v1/notifications/read-all` | все | отметить все прочитанными |
+
+В каждом уведомлении есть ссылка на запись: `entity_type` и `entity_id`.
+По ним клиент открывает нужную карточку:
+
+| `type` | `entity_type` | `entity_id` |
+|---|---|---|
+| `request_created`, `request_approved`, `request_rejected` | `request` | id заявки |
+| `subscription_expiring`, `subscription_expired` | `subscription` | id подписки |
+| `payment_due` | `subscription` | id подписки (платежа ещё нет) |
+
+У уведомлений, созданных до миграции 0011, оба поля `null`. Значение
+`transaction` в схеме зарезервировано, сейчас его никто не отправляет.
 
 Кто что получает по заявкам:
 
