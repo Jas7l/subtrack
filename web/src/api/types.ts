@@ -323,3 +323,64 @@ export interface ForecastResponse {
   // Active subscriptions without a next payment date.
   unscheduled: number
 }
+
+// POST /currencies. rate_to_rub — how many roubles one unit costs.
+export interface CreateCurrencyBody {
+  code: string
+  name: string
+  rate_to_rub: string
+}
+
+// PATCH /currencies/{code}: only the changed fields.
+export interface UpdateCurrencyBody {
+  name?: string
+  rate_to_rub?: string
+}
+
+export type TransactionStatus = 'pending' | 'paid' | 'failed'
+
+export interface TransactionDTO {
+  id: number
+  subscription_id: number
+  subscription_name: string
+  amount: string
+  currency: string
+  payment_date: string
+  status: TransactionStatus
+  // "" — not given.
+  payment_method: string
+  invoice_number: string
+  paid_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+// POST /transactions: a payment entered by hand is stored as paid. Without
+// currency — the subscription's.
+export interface CreateTransactionBody {
+  subscription_id: number
+  amount: string
+  payment_date: string
+  currency?: string
+  payment_method?: string
+  invoice_number?: string
+}
+
+// POST /transactions/{id}/pay; empty fields are left out.
+export interface PayTransactionBody {
+  payment_method?: string
+  invoice_number?: string
+}
+
+export interface NotificationSettingsDTO {
+  expiring_days: number
+  payment_days: number
+  updated_at: string
+  updated_by: number | null
+}
+
+// PUT /settings/notifications.
+export interface NotificationSettingsBody {
+  expiring_days: number
+  payment_days: number
+}

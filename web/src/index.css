@@ -308,6 +308,25 @@ body {
   color: #949ba4;
 }
 
+.cell-money {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Payments: a pending payment whose date has passed. */
+.row-overdue > td {
+  background: rgba(255, 122, 125, 0.06);
+}
+
+.row-overdue > td:first-child {
+  box-shadow: inset 3px 0 0 #ff7a7d;
+}
+
+.cell-overdue {
+  font-size: 13px;
+  color: #ff7a7d;
+}
+
 /* Request history. */
 .history-title {
   font-weight: 600;

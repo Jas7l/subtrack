@@ -17,9 +17,11 @@ import { NotificationsPage } from './pages/NotificationsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RequestPage } from './pages/RequestPage'
 import { RequestsPage } from './pages/RequestsPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { StubPage } from './pages/StubPage'
 import { SubscriptionPage } from './pages/SubscriptionPage'
 import { SubscriptionsPage } from './pages/SubscriptionsPage'
+import { TransactionsPage } from './pages/TransactionsPage'
 import { UserPage } from './pages/UserPage'
 import { UsersPage } from './pages/UsersPage'
 
@@ -123,8 +125,14 @@ const pages: PageDef[] = [
   },
   { path: '/departments', roles: ADMIN, title: 'Отделы', stage: 'К4', Page: DepartmentsPage },
   { path: '/assignments', roles: ADMIN, title: 'Лицензии', stage: 'К4', Page: AssignmentsPage },
-  { path: '/transactions', roles: ADMIN, title: 'Платежи', stage: 'К5' },
-  { path: '/settings', roles: ADMIN, title: 'Настройки', stage: 'К5' },
+  {
+    path: '/transactions',
+    roles: ADMIN,
+    title: 'Платежи',
+    stage: 'К5',
+    Page: TransactionsPage,
+  },
+  { path: '/settings', roles: ADMIN, title: 'Настройки', stage: 'К5', Page: SettingsPage },
   { path: '/recommendations', roles: ADMIN, title: 'Рекомендации', stage: 'К6' },
   { path: '/audit', roles: ADMIN, title: 'Аудит', stage: 'К7' },
 ]

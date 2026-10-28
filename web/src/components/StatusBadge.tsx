@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react'
-import type { RequestStatus, SubscriptionStatus } from '../api/types'
-import { requestStatusLabels, subscriptionStatusLabels } from '../lib/labels'
+import type { RequestStatus, SubscriptionStatus, TransactionStatus } from '../api/types'
+import {
+  requestStatusLabels,
+  subscriptionStatusLabels,
+  transactionStatusLabels,
+} from '../lib/labels'
 import { tones, type Tone } from '../theme'
 
 // StatusBadge is the «pill»: a soft background of the status colour and the
@@ -37,6 +41,18 @@ const requestTones: Record<RequestStatus, Tone> = {
 
 export function RequestStatusBadge({ status }: { status: RequestStatus }) {
   return <StatusBadge tone={requestTones[status]}>{requestStatusLabels[status]}</StatusBadge>
+}
+
+const transactionTones: Record<TransactionStatus, Tone> = {
+  pending: 'warning',
+  paid: 'success',
+  failed: 'error',
+}
+
+export function TransactionStatusBadge({ status }: { status: TransactionStatus }) {
+  return (
+    <StatusBadge tone={transactionTones[status]}>{transactionStatusLabels[status]}</StatusBadge>
+  )
 }
 
 export function UserStatusBadge({ active }: { active: boolean }) {

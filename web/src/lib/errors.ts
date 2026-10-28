@@ -41,6 +41,18 @@ const known: Record<string, string> = {
   'the currency is used by subscriptions, requests or payments and cannot be deleted':
     'Валюта используется в подписках, заявках или платежах — удалить нельзя',
   'bad period': 'Неверный период',
+  'days must be between 0 and 365': 'Число дней — от 0 до 365',
+  'expiring_days and payment_days are both required': 'Укажите оба числа дней',
+  'code must be three Latin letters, like USD': 'Код — три латинские буквы, например USD',
+  'rate_to_rub must be above 0 with at most 6 decimals, like 92.5':
+    'Курс — больше нуля, не больше 6 знаков после запятой',
+  'name must not be empty': 'Укажите название',
+  'missing required fields': 'Заполните обязательные поля',
+  'amount must be a non-negative amount with at most 2 decimals, like 1500.00':
+    'Сумма — не меньше нуля, не больше 2 знаков после запятой',
+  'payment_date is required': 'Укажите дату платежа',
+  'subscription_id is required': 'Выберите подписку',
+  'unknown subscription or currency': 'Такой подписки или валюты нет',
   'insufficient permissions: only the head of the department reviews its requests':
     'Решать по заявкам отдела может только его начальник',
   'insufficient permissions: you are in no department': 'Вы не привязаны к отделу',
@@ -57,6 +69,8 @@ const known: Record<string, string> = {
   'approve with either subscription_id or subscription, not both or neither':
     'Выберите подписку или создайте новую',
   'at least one field must be provided': 'Вы ничего не изменили',
+  'currency not found': 'Валюта не найдена',
+  'transaction not found': 'Платёж не найден',
   'department not found': 'Отдел не найден',
   'assignment not found': 'Лицензия не найдена',
   'user not found': 'Пользователь не найден',

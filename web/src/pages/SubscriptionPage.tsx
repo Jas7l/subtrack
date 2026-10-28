@@ -14,6 +14,7 @@ import {
   useSubscription,
   useUpdateSubscription,
 } from '../api/subscriptions'
+import { useTransactions } from '../api/transactions'
 import type { AssignmentDTO, SubscriptionDTO } from '../api/types'
 import { useMe } from '../auth/AuthContext'
 import { GrantLicenceModal } from '../components/GrantLicenceModal'
@@ -22,6 +23,8 @@ import { QueryState } from '../components/QueryState'
 import { RevokeLicenceButton } from '../components/RevokeLicenceButton'
 import { ServiceTile } from '../components/ServiceTile'
 import { SubscriptionFormModal } from '../components/SubscriptionFormModal'
+import { TransactionFormModal } from '../components/TransactionFormModal'
+import { TransactionsTable } from '../components/TransactionsTable'
 import { SubscriptionStatusBadge } from '../components/StatusBadge'
 import { UserAvatar } from '../components/UserAvatar'
 import { errorText } from '../lib/errors'
@@ -33,9 +36,9 @@ import { costText, isOpen, seatsText } from '../lib/subscriptions'
 // SubscriptionPage: the subscription and its licences. Holders are listed
 // only to whoever manages the subscription (the admin, a manager of the
 // owning department): for anyone else the server returns just their own
-// licence. The admin also edits, cancels and deletes it. The payment history
-// with «Добавить платёж» (К5) and the change history from the audit (К7) go
-// under the two cards.
+// licence. The admin also edits, cancels and deletes it and sees its
+// payments with «Добавить платёж»; the change history from the audit (К7)
+// goes under them.
 export function SubscriptionPage() {
   const id = Number(useParams().id)
   const me = useMe()
@@ -94,6 +97,7 @@ export function SubscriptionPage() {
         </Card>
         {manages ? <Holders subscription={s} /> : <MyLicence subscription={s} />}
       </div>
+      {me.role === 'admin' && <Payments subscription={s} />}
     </>
   )
 }
@@ -222,6 +226,56 @@ function Holders({ subscription: s }: { subscription: SubscriptionDTO }) {
         subscription={s}
         holders={holders}
       />
+    </Card>
+  )
+}
+
+const PAYMENTS_PAGE = 10
+
+// Payments: the subscription's payment history, newest first, with the
+// same «Оплачено» / «Ошибка» as the register. The admin only.
+function Payments({ subscription: s }: { subscription: SubscriptionDTO }) {
+  const [page, setPage] = useState(1)
+  const [adding, setAdding] = useState(false)
+  const payments = useTransactions({
+    subscription_id: s.id,
+    limit: PAYMENTS_PAGE,
+    offset: (page - 1) * PAYMENTS_PAGE,
+  })
+  const total = payments.data?.total ?? 0
+
+  return (
+    <Card
+      variant="borderless"
+      title={`История платежей · ${total}`}
+      style={{ marginTop: 24 }}
+      extra={
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 16 }}>
+          {total > 0 && (
+            <Link to={`/transactions?tab=all&subscription_id=${s.id}`}>В реестре платежей</Link>
+          )}
+          <Button icon={<PlusOutlined />} onClick={() => setAdding(true)}>
+            Добавить платёж
+          </Button>
+        </span>
+      }
+      styles={{ body: { padding: 0 } }}
+    >
+      {payments.error && <Alert type="error" showIcon title={errorText(payments.error)} />}
+      <TransactionsTable
+        items={payments.data?.items}
+        loading={payments.isFetching}
+        withSubscription={false}
+        emptyText="Платежей пока нет"
+        pagination={{
+          current: page,
+          pageSize: PAYMENTS_PAGE,
+          total,
+          hideOnSinglePage: true,
+          onChange: setPage,
+        }}
+      />
+      <TransactionFormModal open={adding} onClose={() => setAdding(false)} subscription={s} />
     </Card>
   )
 }

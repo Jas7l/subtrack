@@ -5,6 +5,7 @@ import type {
   Role,
   SubscriptionStatus,
   SubscriptionType,
+  TransactionStatus,
 } from '../api/types'
 
 export const roleLabels: Record<Role, string> = {
@@ -35,6 +36,12 @@ export const billingPeriodLabels: Record<BillingPeriod, string> = {
 export const assignmentStatusLabels: Record<AssignmentStatus, string> = {
   active: 'Выдана',
   revoked: 'Отозвана',
+}
+
+export const transactionStatusLabels: Record<TransactionStatus, string> = {
+  pending: 'Ожидает оплаты',
+  paid: 'Оплачен',
+  failed: 'Ошибка оплаты',
 }
 
 export const requestStatusLabels: Record<RequestStatus, string> = {
