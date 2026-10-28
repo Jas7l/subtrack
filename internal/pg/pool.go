@@ -101,8 +101,10 @@ func NewPool(ctx context.Context, c Config) (*pgxpool.Pool, error) {
 //   - SQLSTATE 23505 (unique_violation)      → *storage.ConstraintError
 //     (matches storage.ErrAlreadyExists via errors.Is, carries the constraint
 //     name so services can tell which uniqueness rule fired).
-//   - SQLSTATE 23503 (foreign_key_violation) → wrapped storage.ErrNotFound:
-//     "a referenced row is missing" rather than "the target row is missing".
+//   - SQLSTATE 23503 (foreign_key_violation) → wrapped
+//     *storage.ForeignKeyError (matches storage.ErrNotFound: "a referenced
+//     row is missing" rather than "the target row is missing", and carries
+//     the key's name).
 //   - SQLSTATE 23514 (check_violation)       → *storage.CheckError carrying
 //     the constraint name.
 //   - anything else                          → `postgres: <op>: %w` of err,
@@ -124,7 +126,7 @@ func Translate(ctx context.Context, op string, err error) error {
 		case "23503": // foreign_key_violation
 			logger.Op(ctx, "postgres."+op).Warn("foreign key violation",
 				"constraint", pgErr.ConstraintName, "detail", pgErr.Detail)
-			return fmt.Errorf("postgres: %s: %w (fk: %s)", op, storage.ErrNotFound, pgErr.ConstraintName)
+			return fmt.Errorf("postgres: %s: %w", op, &storage.ForeignKeyError{Constraint: pgErr.ConstraintName})
 		case "23514": // check_violation
 			logger.Op(ctx, "postgres."+op).Warn("check violation",
 				"constraint", pgErr.ConstraintName, "detail", pgErr.Detail)

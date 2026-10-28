@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"subtrack/internal/apperr"
@@ -10,6 +11,7 @@ import (
 	"subtrack/internal/domain"
 	"subtrack/internal/paging"
 	"subtrack/internal/password"
+	"subtrack/internal/storage"
 	"subtrack/internal/testkit"
 )
 
@@ -211,6 +213,28 @@ func TestUpdate(t *testing.T) {
 	}
 	if _, ok := f.audit.Last().Details["requests_cancelled"]; ok {
 		t.Errorf("rename counts cancelled requests: %+v", f.audit.Last().Details)
+	}
+}
+
+func TestUpdateStoreErrors(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	no := false
+	tests := []struct {
+		name  string
+		store error
+		want  error
+	}{
+		// The department was there when checked and deleted before the write.
+		{"department gone", fmt.Errorf("postgres: update user: %w", &storage.ForeignKeyError{Constraint: "users_department_id_fkey"}), ErrUnknownDepartment},
+		{"no admin left", errLastAdmin, ErrLastAdmin},
+		{"no such user", storage.ErrNotFound, ErrUserNotFound},
+	}
+	for _, tt := range tests {
+		f.repo.updateErr = tt.store
+		if _, err := f.svc.Update(ctx, f.admin, f.emp.ID, domain.UserPatch{IsActive: &no}); !errors.Is(err, tt.want) {
+			t.Errorf("%s: err = %v, want %v", tt.name, err, tt.want)
+		}
 	}
 }
 

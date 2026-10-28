@@ -42,7 +42,7 @@ func writeErr(ctx context.Context, w http.ResponseWriter, err error) {
 		httpx.Error(ctx, w, http.StatusForbidden, err)
 	case errors.Is(err, ErrUserNotFound):
 		httpx.Error(ctx, w, http.StatusNotFound, err)
-	case errors.Is(err, ErrEmailTaken), errors.Is(err, ErrSelfLockout), errors.Is(err, apperr.ErrConflict):
+	case errors.Is(err, ErrEmailTaken), errors.Is(err, ErrSelfLockout), errors.Is(err, ErrLastAdmin), errors.Is(err, apperr.ErrConflict):
 		httpx.Error(ctx, w, http.StatusConflict, err)
 	default:
 		httpx.Internal(ctx, w, err)

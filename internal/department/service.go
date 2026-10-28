@@ -275,6 +275,9 @@ func (s *Service) checkHead(ctx context.Context, id *int64) error {
 
 // mapWriteErr translates the storage errors of Create/Update.
 func mapWriteErr(err error) error {
+	if errors.Is(err, errHeadGone) {
+		return ErrInvalidHead
+	}
 	var ce *storage.ConstraintError
 	if errors.As(err, &ce) {
 		switch ce.Constraint {

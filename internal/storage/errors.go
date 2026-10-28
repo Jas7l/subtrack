@@ -43,6 +43,27 @@ func (e *ConstraintError) Is(target error) bool {
 	return target == ErrAlreadyExists
 }
 
+// ForeignKeyError is a foreign-key violation (SQLSTATE 23503): the row points
+// at a parent that does not exist, or no longer does. It matches ErrNotFound
+// via errors.Is; Constraint names the key, so a service whose write has a
+// row of its own and a parent to miss can tell the two apart:
+//
+//	var fk *storage.ForeignKeyError
+//	if errors.As(err, &fk) && fk.Constraint == "users_department_id_fkey" {
+//		return ErrUnknownDepartment
+//	}
+type ForeignKeyError struct {
+	Constraint string
+}
+
+func (e *ForeignKeyError) Error() string {
+	return "storage: foreign key violated: " + e.Constraint
+}
+
+func (e *ForeignKeyError) Is(target error) bool {
+	return target == ErrNotFound
+}
+
 // CheckError is a CHECK constraint violation (SQLSTATE 23514): the write
 // would leave a row breaking a rule the schema enforces, such as
 // "seats_used <= seats_total". Constraint names the rule so a service can turn

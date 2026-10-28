@@ -40,9 +40,13 @@ var (
 	ErrUnknownDepartment = errors.New("service: invalid input: department does not exist")
 
 	// ErrSelfLockout is returned when an admin tries to block themselves or
-	// take away their own admin role. Refusing it also guarantees that the
-	// last active admin can never disappear. Mapped to 409.
+	// take away their own admin role. Mapped to 409.
 	ErrSelfLockout = errors.New("service: you cannot block yourself or remove your own admin role")
+
+	// ErrLastAdmin is returned when a change would leave no active admin:
+	// two admins blocking (or demoting) each other at the same moment, which
+	// ErrSelfLockout alone cannot see. Mapped to 409.
+	ErrLastAdmin = errors.New("service: the last active admin cannot be blocked or lose the admin role")
 )
 
 // repo is the slice of users persistence the service needs; *Store satisfies
@@ -345,6 +349,14 @@ func mapWriteErr(err error) error {
 	var ce *storage.ConstraintError
 	if errors.As(err, &ce) && ce.Constraint == "users_email_key" {
 		return ErrEmailTaken
+	}
+	// The department was checked up front, but may be deleted meanwhile.
+	var fk *storage.ForeignKeyError
+	if errors.As(err, &fk) && fk.Constraint == "users_department_id_fkey" {
+		return ErrUnknownDepartment
+	}
+	if errors.Is(err, errLastAdmin) {
+		return ErrLastAdmin
 	}
 	return apperr.MapStorage(err, ErrUserNotFound)
 }

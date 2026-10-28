@@ -16,11 +16,13 @@ import (
 // fakeRepo is an in-memory departments table with the two unique rules
 // (name case-insensitively, head_id) and per-department "still in use"
 // counts for Delete. Moving the head into the department is SQL and not
-// modelled here.
+// modelled here; goneHeads are the heads the store's own check under lock
+// finds blocked or demoted meanwhile.
 type fakeRepo struct {
-	depts  map[int64]domain.Department
-	inUse  map[int64][2]int64 // id → {active users, subscriptions}
-	nextID int64
+	depts     map[int64]domain.Department
+	inUse     map[int64][2]int64 // id → {active users, subscriptions}
+	nextID    int64
+	goneHeads map[int64]bool
 }
 
 func newFakeRepo() *fakeRepo {
@@ -61,6 +63,9 @@ func (f *fakeRepo) check(d domain.Department) error {
 }
 
 func (f *fakeRepo) Create(_ context.Context, d domain.Department) (domain.Department, error) {
+	if d.HeadID != nil && f.goneHeads[*d.HeadID] {
+		return domain.Department{}, errHeadGone
+	}
 	if err := f.check(d); err != nil {
 		return domain.Department{}, err
 	}
@@ -79,6 +84,9 @@ func (f *fakeRepo) Update(_ context.Context, id int64, p domain.DepartmentPatch)
 		d.Name = *p.Name
 	}
 	if p.HeadID.Set {
+		if p.HeadID.Value != nil && f.goneHeads[*p.HeadID.Value] {
+			return domain.Department{}, errHeadGone
+		}
 		d.HeadID = p.HeadID.Value
 	}
 	if err := f.check(d); err != nil {
@@ -201,6 +209,20 @@ func TestUpdate(t *testing.T) {
 	// Now free, the manager can head the other department.
 	if _, err := svc.Update(ctx, admin, design.ID, domain.DepartmentPatch{HeadID: domain.IDPatch{Set: true, Value: &manager.ID}}); err != nil {
 		t.Errorf("freed head moves: %v", err)
+	}
+}
+
+func TestHeadBlockedMeanwhile(t *testing.T) {
+	ctx := context.Background()
+	svc, repo := newTestService()
+	d, _ := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Разработка"})
+	// The up-front check sees an active manager; by the write they are not.
+	repo.goneHeads = map[int64]bool{manager2.ID: true}
+	if _, err := svc.Update(ctx, admin, d.ID, domain.DepartmentPatch{HeadID: domain.IDPatch{Set: true, Value: &manager2.ID}}); !errors.Is(err, ErrInvalidHead) {
+		t.Errorf("update: err = %v, want ErrInvalidHead", err)
+	}
+	if _, err := svc.Create(ctx, admin, CreateDepartmentInput{Name: "Дизайн", HeadID: &manager2.ID}); !errors.Is(err, ErrInvalidHead) {
+		t.Errorf("create: err = %v, want ErrInvalidHead", err)
 	}
 }
 

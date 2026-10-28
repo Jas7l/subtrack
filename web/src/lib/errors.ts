@@ -14,6 +14,8 @@ const known: Record<string, string> = {
   'email is already taken': 'Этот email уже занят',
   'you cannot block yourself or remove your own admin role':
     'Нельзя заблокировать себя или снять с себя роль администратора',
+  'the last active admin cannot be blocked or lose the admin role':
+    'Нельзя заблокировать или понизить последнего активного администратора',
   'department name is already taken': 'Отдел с таким названием уже есть',
   'department is not empty': 'В отделе есть сотрудники или подписки — удалить нельзя',
   'department does not exist': 'Такого отдела нет',

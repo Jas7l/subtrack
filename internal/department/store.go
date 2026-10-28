@@ -2,6 +2,7 @@ package department
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -103,12 +104,17 @@ func (s *Store) List(ctx context.Context, query string, limit, offset int) ([]do
 	return out, total, nil
 }
 
+// errHeadGone is returned when the new head is no longer an active manager
+// by the time the department is written (blocked or demoted meanwhile).
+var errHeadGone = errors.New("department store: head is missing, blocked or not a manager")
+
 // Create inserts a department and, when HeadID is set, moves the head into it
 // - one transaction, so the department never exists with a head who works
 // elsewhere. Returns the stored row. The service has already checked that the
-// head is an active manager.
+// head is an active manager; lockHead checks it again under lock.
 //
 // Errors:
+//   - errHeadGone when the head stopped being an active manager meanwhile.
 //   - *storage.ConstraintError "departments_name_key" when the name is taken
 //     (case-insensitively).
 //   - *storage.ConstraintError "departments_head_id_key" when the head already
@@ -122,6 +128,11 @@ func (s *Store) Create(ctx context.Context, d domain.Department) (domain.Departm
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	if d.HeadID != nil {
+		if err := lockHead(ctx, tx, *d.HeadID); err != nil {
+			return domain.Department{}, err
+		}
+	}
 	var id int64
 	err = tx.QueryRow(ctx,
 		`INSERT INTO subtrack.departments (name, head_id) VALUES ($1, $2) RETURNING id`,
@@ -149,6 +160,8 @@ func (s *Store) Create(ctx context.Context, d domain.Department) (domain.Departm
 // any, stays in the department as an ordinary manager.
 //
 // Errors:
+//   - errHeadGone when the new head stopped being an active manager
+//     meanwhile.
 //   - storage.ErrNotFound when no row has that id.
 //   - the same constraint errors as Create.
 //   - any other db error wrapped as "postgres: update department: ...".
@@ -176,6 +189,11 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.DepartmentPatch) 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	if p.HeadID.Set && p.HeadID.Value != nil {
+		if err := lockHead(ctx, tx, *p.HeadID.Value); err != nil {
+			return domain.Department{}, err
+		}
+	}
 	if err := tx.QueryRow(ctx, q, args...).Scan(&id); err != nil {
 		return domain.Department{}, pg.Translate(ctx, "update department", err)
 	}
@@ -192,6 +210,25 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.DepartmentPatch) 
 		return domain.Department{}, pg.Translate(ctx, "commit update department", err)
 	}
 	return out, nil
+}
+
+// lockHead locks the user who is to head a department and checks, under that
+// lock, that they are still an active manager: blocking or demoting them at
+// the same moment either waits for the appointment (and then leaves the
+// department without a head, as usual) or makes it fail. The user is locked
+// before the department, the order user.Store.Update takes them in.
+func lockHead(ctx context.Context, tx pgx.Tx, headID int64) error {
+	var one int
+	err := tx.QueryRow(ctx, `
+		SELECT 1 FROM subtrack.users WHERE id = $1 AND is_active AND role = 'manager'
+		FOR UPDATE`, headID).Scan(&one)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errHeadGone
+	}
+	if err != nil {
+		return pg.Translate(ctx, "lock head", err)
+	}
+	return nil
 }
 
 // moveHead puts the head into the department they now lead. They cannot be

@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -15,6 +16,14 @@ import (
 // userColumns is the column list every SELECT / RETURNING here reads, in the
 // order scanUser expects.
 const userColumns = `id, full_name, email, password_hash, role, department_id, is_active, created_at, updated_at`
+
+// errLastAdmin is returned by Update when the change would leave no active
+// admin.
+var errLastAdmin = errors.New("user store: no active admin would be left")
+
+// adminsLock is the advisory lock that changes which may take away an admin
+// (blocking, a new role) wait for each other on.
+const adminsLock = 7_301_001
 
 // Store reads and writes subtrack.users. The pool is borrowed, not owned.
 // Every method runs on pg.Conn(ctx, pool), so it joins a transaction started
@@ -193,13 +202,19 @@ type Undone struct {
 //   - a blocked user holds no licences: blocking revokes every active
 //     assignment of theirs on behalf of actorID and frees the seats;
 //   - a blocked user has no pending requests: blocking cancels them, as
-//     nobody could approve them any more.
+//     nobody could approve them any more;
+//   - an active admin is always left: blocking someone or changing their
+//     role waits on adminsLock for any other such change, then checks.
+//     Two admins blocking each other at once: the second one fails.
 //
-// Lock order: the requests first, then the user, then their subscriptions
-// and assignments - the order a decision on a request takes them in (the
-// request, then the requester when the licence is handed out).
+// Lock order: adminsLock (taken by nothing else), the requests, then the
+// user, then their subscriptions and assignments - the order a decision on a
+// request takes them in (the request, then the requester when the licence is
+// handed out). A department's new head is locked the same way: the user
+// before the department.
 //
 // Errors:
+//   - errLastAdmin when no active admin would be left.
 //   - storage.ErrNotFound when no row has that id.
 //   - *storage.ConstraintError "users_email_key" when the new email is taken.
 //   - wrapped storage.ErrNotFound when DepartmentID names no department.
@@ -237,6 +252,13 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorI
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	mayDropAdmin := (p.IsActive != nil && !*p.IsActive) || p.Role != nil
+	if mayDropAdmin {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, adminsLock); err != nil {
+			return domain.User{}, Undone{}, pg.Translate(ctx, "update user lock admins", err)
+		}
+	}
+
 	var undone Undone
 	if p.IsActive != nil && !*p.IsActive {
 		tag, err := tx.Exec(ctx, `
@@ -266,6 +288,17 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorI
 		undone.LicencesRevoked, err = revokeLicences(ctx, tx, u.ID, actorID)
 		if err != nil {
 			return domain.User{}, Undone{}, pg.Translate(ctx, "update user revoke licences", err)
+		}
+	}
+	if mayDropAdmin {
+		var left bool
+		err := tx.QueryRow(ctx,
+			`SELECT EXISTS (SELECT 1 FROM subtrack.users WHERE role = 'admin' AND is_active)`).Scan(&left)
+		if err != nil {
+			return domain.User{}, Undone{}, pg.Translate(ctx, "update user admins left", err)
+		}
+		if !left {
+			return domain.User{}, Undone{}, errLastAdmin
 		}
 	}
 

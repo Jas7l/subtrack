@@ -21,6 +21,8 @@ type fakeRepo struct {
 	nextID int64
 	// undone is what every Update reports it took back.
 	undone Undone
+	// updateErr, when set, is what Update fails with.
+	updateErr error
 }
 
 func newFakeRepo() *fakeRepo {
@@ -83,6 +85,9 @@ func (f *fakeRepo) Create(_ context.Context, u domain.User) (domain.User, error)
 func (f *fakeRepo) Update(_ context.Context, id int64, p domain.UserPatch, _ int64) (domain.User, Undone, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.updateErr != nil {
+		return domain.User{}, Undone{}, f.updateErr
+	}
 	u, ok := f.users[id]
 	if !ok {
 		return domain.User{}, Undone{}, storage.ErrNotFound

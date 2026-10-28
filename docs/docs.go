@@ -3522,7 +3522,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Partial update; at least one field. ` + "`" + `\"is_active\": false` + "`" + ` blocks the user (their tokens stop working at once), ` + "`" + `true` + "`" + ` unblocks. ` + "`" + `\"department_id\": null` + "`" + ` removes them from their department. If the user headed a department and is blocked, demoted or moved out of it, that department is left without a head. Blocking also revokes all their licences. An admin cannot block themselves or drop their own admin role (409).",
+                "description": "Partial update; at least one field. ` + "`" + `\"is_active\": false` + "`" + ` blocks the user (their tokens stop working at once), ` + "`" + `true` + "`" + ` unblocks. ` + "`" + `\"department_id\": null` + "`" + ` removes them from their department. If the user headed a department and is blocked, demoted or moved out of it, that department is left without a head. Blocking also revokes all their licences and cancels their pending requests. An admin cannot block themselves or drop their own admin role (409), and the last active admin cannot be blocked or demoted (409; two admins blocking each other at once).",
                 "consumes": [
                     "application/json"
                 ],
