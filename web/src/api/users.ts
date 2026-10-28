@@ -27,9 +27,11 @@ export function useUser(id: number) {
 }
 
 // A user change moves department heads and head counts; blocking also
-// revokes every licence (seats, analytics). The admin may edit themselves.
+// revokes every licence (seats, analytics) and cancels the user's pending
+// requests. The admin may edit themselves.
 function afterChange(queryClient: QueryClient) {
-  for (const key of ['users', 'departments', 'assignments', 'subscriptions', 'analytics', 'auth']) {
+  const keys = ['users', 'departments', 'assignments', 'subscriptions', 'requests', 'analytics', 'auth']
+  for (const key of keys) {
     void queryClient.invalidateQueries({ queryKey: [key] })
   }
 }

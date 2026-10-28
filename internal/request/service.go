@@ -51,7 +51,7 @@ var (
 	ErrWaitsForAdmin = apperr.New(apperr.ErrConflict, "service: the request already waits for the admin")
 
 	// ErrWaitsForHead is returned when the admin acts on a request that waits
-	// for its department head. Mapped to 409.
+	// for its department head (one other than the requester). Mapped to 409.
 	ErrWaitsForHead = apperr.New(apperr.ErrConflict, "service: the request waits for the department head")
 
 	// ErrNotHead is returned when a manager who can see the request (same
@@ -298,7 +298,7 @@ func (s *Service) Create(ctx context.Context, actor domain.User, in CreateReques
 
 // Decide applies actor's verdict to the request id: the department head's at
 // pending_manager, the admin's at pending_admin (or at pending_manager when
-// the department has no head).
+// the department has no head, or its head is the requester).
 //
 // Errors:
 //   - ErrRequestNotFound when it does not exist or is outside actor's view.
@@ -423,7 +423,10 @@ func (s *Service) decideAsAdmin(ctx context.Context, actor domain.User, id int64
 		if err != nil {
 			return domain.Request{}, err
 		}
-		if head != nil {
+		// The admin steps in when nobody else can decide: the department
+		// has no head, or its head is the requester (made head while the
+		// request waited; ErrOwnRequest keeps them from deciding it).
+		if head != nil && *head != r.RequesterID {
 			return domain.Request{}, ErrWaitsForHead
 		}
 	default:

@@ -110,6 +110,21 @@ func TestSummaryScope(t *testing.T) {
 	}
 }
 
+func TestRecommendationsCountMonthsInCompanyZone(t *testing.T) {
+	svc, repo := newService()
+	// Moscow is on 2026-11-01 (UTC still on 10-31): to 2027-01-01 are
+	// exactly 2 months, 1000 of the 12000 a year each. Counted in UTC it
+	// would be 3.
+	repo.subs = []sub{mk(1, "1000", func(s *sub) { s.SeatsUsed, s.EndDate = 0, dayPtr("2027-01-01") })}
+	recs, total, err := svc.Recommendations(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 1 || total != "2000.00" {
+		t.Errorf("recommendations = %+v, total %s; want one saving 2000.00", recs, total)
+	}
+}
+
 func TestForecastMonthsClamp(t *testing.T) {
 	svc, _ := newService()
 	f, _ := svc.Forecast(context.Background(), head, nil, 0)

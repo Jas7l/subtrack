@@ -121,7 +121,7 @@ func (s *Service) Summary(ctx context.Context, actor domain.User, deptID *int64)
 		if err != nil {
 			return Summary{}, err
 		}
-		recs := recommend(subs, s.now())
+		recs := recommend(subs, s.now().In(s.loc))
 		n, savings := len(recs), money(totalSavings(recs))
 		out.Payments, out.Recommendations, out.PotentialSavingsRUB = &p, &n, &savings
 	}
@@ -261,7 +261,7 @@ func (s *Service) Recommendations(ctx context.Context, deptID *int64) ([]Recomme
 	if err != nil {
 		return nil, "", err
 	}
-	recs := recommend(subs, s.now())
+	recs := recommend(subs, s.now().In(s.loc))
 	return recs, money(totalSavings(recs)), nil
 }
 

@@ -47,7 +47,7 @@ func TestSpecMatchesRouter(t *testing.T) {
 		t.Fatalf("read spec (run `make swagger`): %v", err)
 	}
 	var spec struct {
-		BasePath string                     `json:"basePath"`
+		BasePath string                    `json:"basePath"`
 		Paths    map[string]map[string]any `json:"paths"`
 	}
 	if err := json.Unmarshal(b, &spec); err != nil {

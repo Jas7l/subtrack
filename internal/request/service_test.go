@@ -440,6 +440,10 @@ func TestNoDecisionOnOwnRequest(t *testing.T) {
 	if _, err := f.svc.Decide(ctx, head, r.ID, Verdict{Approve: true}); !errors.Is(err, ErrOwnRequest) || !errors.Is(err, auth.ErrForbidden) {
 		t.Errorf("head on own request: err = %v, want ErrOwnRequest", err)
 	}
+	// Nobody else heads the department, so the admin decides it.
+	if got, err := f.svc.Decide(ctx, f.admin, r.ID, Verdict{Approve: true, SubscriptionID: ptr(int64(9))}); err != nil || got.Status != domain.ReqApproved {
+		t.Errorf("admin on the head's own request: %+v, %v", got.Status, err)
+	}
 
 	// A manager's request goes to the admin; they were made admin meanwhile.
 	r = f.file(t, f.mgr2)

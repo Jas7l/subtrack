@@ -23,8 +23,9 @@ export function whenText(days: number): string {
 }
 
 // dashEvents puts together what needs the admin's attention soon: overdue
-// payments first, then upcoming payments (by next_payment_date; pending
-// payments appear only once that date has come) and expiring subscriptions
+// payments first, then upcoming payments (by next_payment_date, not after
+// the end date — the scheduler charges none of those; pending payments
+// appear only once that date has come) and expiring subscriptions
 // by date, then subscriptions expired lately, the latest first. Identical
 // lines (individual copies of one product paid the same day) become one
 // with «×N».
@@ -45,7 +46,9 @@ export function dashEvents(subs: SubscriptionDTO[], pending: TransactionDTO[]): 
   }
   for (const s of subs) {
     const open = s.status === 'active' || s.status === 'expiring_soon'
-    if (open && s.next_payment_date) {
+    // Dates as "YYYY-MM-DD" compare as strings.
+    const due = s.next_payment_date && (!s.end_date || s.next_payment_date <= s.end_date)
+    if (open && s.next_payment_date && due) {
       const days = daysLeft(s.next_payment_date)
       if (days >= 0 && days <= PAYMENTS_AHEAD_DAYS) {
         soon.push({

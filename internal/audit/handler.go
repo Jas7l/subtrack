@@ -3,7 +3,9 @@ package audit
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"subtrack/internal/apperr"
@@ -81,10 +83,16 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(r.Context(), w, out)
 }
 
+// entityTypes are the entity_type values the trail is written with.
+var entityTypes = []string{"user", "department", "subscription", "assignment", "request", "transaction", "settings", "currency"}
+
 // parseFilter reads the list filters. A malformed filter is a 400.
 func parseFilter(r *http.Request) (domain.AuditFilter, error) {
 	q := r.URL.Query()
 	f := domain.AuditFilter{EntityType: q.Get("entity_type"), Action: q.Get("action")}
+	if f.EntityType != "" && !slices.Contains(entityTypes, f.EntityType) {
+		return f, fmt.Errorf("%w: entity_type must be one of %s", apperr.ErrInvalidInput, strings.Join(entityTypes, ", "))
+	}
 	for _, p := range []struct {
 		key string
 		dst **int64

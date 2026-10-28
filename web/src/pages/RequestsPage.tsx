@@ -108,14 +108,15 @@ export function RequestsPage() {
   }
 
   const shown = admin ? columns : columns.filter((c) => c.key !== 'department')
-  // pending_manager of departments without a head wait for the admin too;
-  // «Все» shows them (by department when they are all in one).
+  // pending_manager nobody else can decide (no head, or the head made the
+  // request) wait for the admin too; «Все» shows them (by department when
+  // they are all in one).
   const n = headless.count
   const headlessNote = n > 0 && (
     <Alert
       type="warning"
       showIcon
-      title={`${n} ${plural(n, 'заявка ждёт', 'заявки ждут', 'заявок ждут')} начальника отдела, но начальника в отделе нет — решение за вами`}
+      title={`${n} ${plural(n, 'заявка ждёт', 'заявки ждут', 'заявок ждут')} решения начальника отдела, но решить некому: начальника нет или это его собственная заявка. Решение за вами`}
       action={
         <Button
           size="small"

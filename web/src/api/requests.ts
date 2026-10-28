@@ -23,14 +23,17 @@ export function usePendingRequestsCount(status: 'pending_manager' | 'pending_adm
 }
 
 // useHeadlessRequests: the admin's share of pending_manager — the requests
-// of departments left without a head while they waited (the server lets the
-// admin decide them; the inbox asks only for pending_admin). `departments`
-// are where they are, to filter the list by.
+// nobody else can decide: of departments left without a head while they
+// waited, or whose head is the requester (made head meanwhile). The server
+// lets the admin decide them; the inbox asks only for pending_admin.
+// `departments` are where they are, to filter the list by.
 export function useHeadlessRequests(enabled: boolean) {
   const departments = useDepartments(undefined, enabled)
-  const headless = new Set(
-    (departments.data?.items ?? []).filter((d) => d.head_id === null).map((d) => d.id),
-  )
+  const heads = new Map((departments.data?.items ?? []).map((d) => [d.id, d.head_id]))
+  const headless = (r: RequestDTO) => {
+    const head = r.department_id === null ? null : (heads.get(r.department_id) ?? null)
+    return head === null || head === r.requester_id
+  }
   const waiting = useQuery({
     queryKey: ['requests', 'headless'],
     queryFn: () =>
@@ -38,9 +41,7 @@ export function useHeadlessRequests(enabled: boolean) {
     enabled: enabled && departments.data !== undefined,
     refetchInterval: 30_000,
   })
-  const items = (waiting.data?.items ?? []).filter(
-    (r) => r.department_id === null || headless.has(r.department_id),
-  )
+  const items = (waiting.data?.items ?? []).filter(headless)
   return { count: items.length, departments: [...new Set(items.map((r) => r.department_id))] }
 }
 

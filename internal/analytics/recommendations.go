@@ -56,8 +56,9 @@ type Recommendation struct {
 	savings         *big.Rat
 }
 
-// recommend runs every rule over the scope's subscriptions. The result is
-// sorted by saving, largest first; advice without a computed saving
+// recommend runs every rule over the scope's subscriptions as of now, given
+// in the company's zone: its calendar day decides the months counted. The
+// result is sorted by saving, largest first; advice without a computed saving
 // follows, in the order of the rules above.
 func recommend(subs []sub, now time.Time) []Recommendation {
 	var out []Recommendation
