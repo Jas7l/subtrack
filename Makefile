@@ -1,4 +1,4 @@
-.PHONY: install.dep lint vet test build run clean swagger seed web-install web-dev web-build
+.PHONY: install.dep lint vet test build run clean swagger seed web-install web-dev web-build web-build-demo start demo
 
 PROJECTNAME ?= subtrack
 PROJECT_VERSION ?= 0.0.0
@@ -61,3 +61,15 @@ web-dev:
 
 web-build:
 	cd web && $(WEB_ENV) npm run build
+
+# web-build-demo is web-build with the demo sign-in buttons on the login page
+# (the accounts of make seed), for the presentation.
+web-build-demo:
+	cd web && $(WEB_ENV) VITE_DEMO=1 npm run build
+
+# start builds the client and the server and runs one process: the app and
+# the API on http://localhost:8080 (the server serves web/dist, see WEB_DIR).
+start: web-build run
+
+# demo is start with the demo sign-in buttons.
+demo: web-build-demo run

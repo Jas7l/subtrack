@@ -112,6 +112,9 @@ func run() error {
 	if err := server.Mount(ctx, r, pool, cfg.Auth, cfg.Scheduler.Location); err != nil {
 		return err
 	}
+	// The client goes last: it answers whatever the API, /healthz and
+	// Swagger did not.
+	mountWeb(r, cfg.Web, log)
 
 	// The scheduler stops before the pool closes: this defer runs first.
 	schedCtx, stopSched := context.WithCancel(ctx)

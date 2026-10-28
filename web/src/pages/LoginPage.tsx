@@ -13,8 +13,11 @@ interface Credentials {
   password: string
 }
 
-// Demo accounts from `make seed`, for quick sign-in in development only. The
-// admin's password comes from .env, so that button fills just the email.
+// Demo accounts from `make seed`, for quick sign-in: shown in development
+// (Vite) and in a demo build (`make demo`, VITE_DEMO=1), never in a regular
+// one. The admin's password comes from .env, so that button fills just the
+// email.
+const showDemo = import.meta.env.DEV || import.meta.env.VITE_DEMO === '1'
 const demoAccounts = [
   { label: 'Админ', email: 'admin@company.ru', password: '' },
   { label: 'Начальник', email: 'ivanov@company.ru', password: 'password123' },
@@ -123,10 +126,10 @@ export function LoginPage() {
             </Button>
           </Form>
 
-          {import.meta.env.DEV && (
+          {showDemo && (
             <div style={{ marginTop: 32 }}>
               <p style={{ margin: '0 0 10px', fontSize: 13, color: '#949BA4' }}>
-                Демо-аккаунты (только в режиме разработки)
+                Демо-аккаунты
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {demoAccounts.map((a) => (
