@@ -1,25 +1,36 @@
 import { Alert, App, Form, Modal } from 'antd'
 import { useCreateAssignment } from '../api/assignments'
-import type { SubscriptionDTO } from '../api/types'
+import type { SubscriptionDTO, UserDTO } from '../api/types'
 import { errorText } from '../lib/errors'
+import { SubscriptionSelect } from './SubscriptionSelect'
 import { UserSelect } from './UserSelect'
 
-// GrantLicenceModal: POST /assignments. `holders` are the users who already
-// have the licence; they are not offered (the server would answer 409). On an
-// error (no free seats and the like) the modal stays open.
+interface Values {
+  subscription_id: number
+  user_id: number
+}
+
+// GrantLicenceModal: POST /assignments. A fixed `subscription` (its card) or
+// a fixed `user` (the user's card) is not asked for; with neither (the
+// licences page) both are picked. `holders` are the users who already have
+// the licence of the fixed subscription; they are not offered (the server
+// would answer 409). On an error (no free seats and the like) the modal
+// stays open.
 export function GrantLicenceModal({
   open,
   onClose,
   subscription,
+  user,
   holders,
 }: {
   open: boolean
   onClose: () => void
-  subscription: SubscriptionDTO
-  holders: ReadonlySet<number>
+  subscription?: SubscriptionDTO
+  user?: UserDTO
+  holders?: ReadonlySet<number>
 }) {
   const { message } = App.useApp()
-  const [form] = Form.useForm<{ user_id: number }>()
+  const [form] = Form.useForm<Values>()
   const create = useCreateAssignment()
 
   const close = () => {
@@ -27,21 +38,30 @@ export function GrantLicenceModal({
     onClose()
   }
 
-  const submit = ({ user_id }: { user_id: number }) =>
+  const submit = (v: Values) =>
     create.mutate(
-      { subscription_id: subscription.id, user_id },
+      {
+        subscription_id: subscription?.id ?? v.subscription_id,
+        user_id: user?.id ?? v.user_id,
+      },
       {
         onSuccess: (a) => {
-          message.success(`Лицензия выдана: ${a.user_name}`)
+          message.success(`Лицензия «${a.subscription_name}» выдана: ${a.user_name}`)
           form.resetFields()
           close()
         },
       },
     )
 
+  const title = subscription
+    ? `Выдать лицензию «${subscription.name}»`
+    : user
+      ? `Выдать лицензию: ${user.full_name}`
+      : 'Выдать лицензию'
+
   return (
     <Modal
-      title={`Выдать лицензию «${subscription.name}»`}
+      title={title}
       open={open}
       onCancel={close}
       onOk={() => form.submit()}
@@ -53,13 +73,24 @@ export function GrantLicenceModal({
         <Alert type="error" showIcon title={errorText(create.error)} style={{ marginBottom: 16 }} />
       )}
       <Form form={form} layout="vertical" requiredMark={false} onFinish={submit}>
-        <Form.Item
-          name="user_id"
-          label="Сотрудник"
-          rules={[{ required: true, message: 'Выберите сотрудника' }]}
-        >
-          <UserSelect exclude={holders} />
-        </Form.Item>
+        {!subscription && (
+          <Form.Item
+            name="subscription_id"
+            label="Подписка"
+            rules={[{ required: true, message: 'Выберите подписку' }]}
+          >
+            <SubscriptionSelect />
+          </Form.Item>
+        )}
+        {!user && (
+          <Form.Item
+            name="user_id"
+            label="Сотрудник"
+            rules={[{ required: true, message: 'Выберите сотрудника' }]}
+          >
+            <UserSelect exclude={holders} />
+          </Form.Item>
+        )}
       </Form>
     </Modal>
   )

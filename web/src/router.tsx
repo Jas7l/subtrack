@@ -7,6 +7,8 @@ import { RequireAuth } from './auth/RequireAuth'
 import { RequireRole } from './auth/RequireRole'
 import { AppLayout } from './layout/AppLayout'
 import { homePath } from './lib/roles'
+import { AssignmentsPage } from './pages/AssignmentsPage'
+import { DepartmentsPage } from './pages/DepartmentsPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyRequestsPage } from './pages/MyRequestsPage'
 import { MySubscriptionsPage } from './pages/MySubscriptionsPage'
@@ -82,7 +84,6 @@ const pages: PageDef[] = [
     title: { admin: 'Подписки', manager: 'Подписки отдела' },
     stage: 'К4',
     Page: SubscriptionsPage,
-    builtFor: MANAGER,
   },
   {
     path: '/subscriptions/:id',
@@ -90,7 +91,6 @@ const pages: PageDef[] = [
     title: 'Подписка',
     stage: 'К4',
     Page: SubscriptionPage,
-    builtFor: STAFF,
   },
   {
     path: '/requests',
@@ -98,7 +98,6 @@ const pages: PageDef[] = [
     title: { admin: 'Все заявки', manager: 'Заявки отдела' },
     stage: 'К4',
     Page: RequestsPage,
-    builtFor: MANAGER,
   },
   {
     path: '/users',
@@ -106,7 +105,6 @@ const pages: PageDef[] = [
     title: { admin: 'Пользователи', manager: 'Сотрудники отдела' },
     stage: 'К4',
     Page: UsersPage,
-    builtFor: MANAGER,
   },
   {
     path: '/users/:id',
@@ -114,7 +112,6 @@ const pages: PageDef[] = [
     title: 'Пользователь',
     stage: 'К4',
     Page: UserPage,
-    builtFor: MANAGER,
   },
   {
     path: '/forecast',
@@ -124,8 +121,8 @@ const pages: PageDef[] = [
     Page: ForecastPage,
     builtFor: MANAGER,
   },
-  { path: '/departments', roles: ADMIN, title: 'Отделы', stage: 'К4' },
-  { path: '/assignments', roles: ADMIN, title: 'Лицензии', stage: 'К4' },
+  { path: '/departments', roles: ADMIN, title: 'Отделы', stage: 'К4', Page: DepartmentsPage },
+  { path: '/assignments', roles: ADMIN, title: 'Лицензии', stage: 'К4', Page: AssignmentsPage },
   { path: '/transactions', roles: ADMIN, title: 'Платежи', stage: 'К5' },
   { path: '/settings', roles: ADMIN, title: 'Настройки', stage: 'К5' },
   { path: '/recommendations', roles: ADMIN, title: 'Рекомендации', stage: 'К6' },

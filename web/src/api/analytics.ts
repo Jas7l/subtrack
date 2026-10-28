@@ -15,12 +15,13 @@ export function useSummary(scope: Scope = {}) {
   })
 }
 
-export function useByCategory(scope: Scope = {}) {
+export function useByCategory(scope: Scope = {}, enabled = true) {
   return useQuery({
     queryKey: ['analytics', 'by-category', scope],
     queryFn: () =>
       request<{ items: SliceDTO[] }>('/analytics/by-category', { query: { ...scope } }),
     select: (res) => res.items,
+    enabled,
   })
 }
 

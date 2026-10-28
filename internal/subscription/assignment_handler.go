@@ -20,8 +20,10 @@ type AssignmentDTO struct {
 	UserName         string     `json:"user_name" example:"Петров Пётр Петрович"`
 	Status           string     `json:"status" example:"active" enums:"active,revoked"`
 	AssignedBy       *int64     `json:"assigned_by" example:"1"`
+	AssignedByName   *string    `json:"assigned_by_name" example:"Администратор"`
 	AssignedAt       time.Time  `json:"assigned_at" example:"2026-10-23T10:00:00Z"`
 	RevokedBy        *int64     `json:"revoked_by" example:"1"`
+	RevokedByName    *string    `json:"revoked_by_name" example:"Иванов Иван Сергеевич"`
 	RevokedAt        *time.Time `json:"revoked_at" example:"2026-11-02T09:30:00Z"`
 }
 
@@ -34,8 +36,10 @@ func toAssignmentDTO(a domain.Assignment) AssignmentDTO {
 		UserName:         a.UserName,
 		Status:           string(a.Status),
 		AssignedBy:       a.AssignedBy,
+		AssignedByName:   a.AssignedByName,
 		AssignedAt:       a.AssignedAt,
 		RevokedBy:        a.RevokedBy,
+		RevokedByName:    a.RevokedByName,
 		RevokedAt:        a.RevokedAt,
 	}
 }

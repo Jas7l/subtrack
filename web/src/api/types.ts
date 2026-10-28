@@ -121,8 +121,12 @@ export interface AssignmentDTO {
   user_name: string
   status: AssignmentStatus
   assigned_by: number | null
+  assigned_by_name: string | null
   assigned_at: string
+  // Blocking the holder or cancelling the subscription records the admin who
+  // did it; the ids are null only if that user row is gone.
   revoked_by: number | null
+  revoked_by_name: string | null
   revoked_at: string | null
 }
 
@@ -176,11 +180,85 @@ export interface CurrencyDTO {
   updated_by: number | null
 }
 
+// POST /users. No department_id: the user is in no department.
+export interface CreateUserBody {
+  full_name: string
+  email: string
+  password: string
+  role: Role
+  department_id?: number
+}
+
+// PATCH /users/{id}: only the changed fields; department_id null — remove
+// from the department.
+export interface UpdateUserBody {
+  full_name?: string
+  email?: string
+  role?: Role
+  department_id?: number | null
+  is_active?: boolean
+}
+
+export interface CreateDepartmentBody {
+  name: string
+  head_id?: number
+}
+
+// PATCH /departments/{id}: head_id null leaves the department without a head.
+export interface UpdateDepartmentBody {
+  name?: string
+  head_id?: number | null
+}
+
+// POST /subscriptions. seats_total: required for group, 1 or absent for
+// individual, absent for enterprise. No department_id — company-wide.
+export interface CreateSubscriptionBody {
+  name: string
+  vendor?: string
+  category?: string
+  type: SubscriptionType
+  cost: string
+  currency: string
+  billing_period: BillingPeriod
+  start_date: string
+  end_date?: string
+  next_payment_date?: string
+  department_id?: number
+  seats_total?: number
+}
+
+// PATCH /subscriptions/{id}: only the changed fields; null clears end_date,
+// next_payment_date or department_id. People set the status to active or
+// cancelled only.
+export interface UpdateSubscriptionBody {
+  name?: string
+  vendor?: string
+  category?: string
+  type?: SubscriptionType
+  cost?: string
+  currency?: string
+  billing_period?: BillingPeriod
+  start_date?: string
+  end_date?: string | null
+  next_payment_date?: string | null
+  status?: 'active' | 'cancelled'
+  department_id?: number | null
+  seats_total?: number
+}
+
+// The subscription the admin creates while approving a request: name, vendor
+// and department_id default to the request's (department_id null —
+// company-wide).
+export interface NewSubscriptionBody extends Omit<CreateSubscriptionBody, 'name' | 'department_id'> {
+  name?: string
+  department_id?: number | null
+}
+
 export interface ApproveBody {
   comment?: string
-  // The admin's choice (К4): an existing subscription or a new one.
+  // The admin picks exactly one: an existing subscription or a new one.
   subscription_id?: number
-  subscription?: Record<string, unknown>
+  subscription?: NewSubscriptionBody
 }
 
 export interface CreateAssignmentBody {

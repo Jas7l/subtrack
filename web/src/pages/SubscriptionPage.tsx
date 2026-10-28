@@ -1,9 +1,19 @@
-import { PlusOutlined, TeamOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Descriptions, Empty, Table, type TableProps } from 'antd'
+import {
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  StopOutlined,
+  TeamOutlined,
+} from '@ant-design/icons'
+import { Alert, App, Button, Card, Descriptions, Empty, Table, type TableProps } from 'antd'
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useAssignments } from '../api/assignments'
-import { useSubscription } from '../api/subscriptions'
+import {
+  useDeleteSubscription,
+  useSubscription,
+  useUpdateSubscription,
+} from '../api/subscriptions'
 import type { AssignmentDTO, SubscriptionDTO } from '../api/types'
 import { useMe } from '../auth/AuthContext'
 import { GrantLicenceModal } from '../components/GrantLicenceModal'
@@ -11,6 +21,7 @@ import { PageHeader } from '../components/PageHeader'
 import { QueryState } from '../components/QueryState'
 import { RevokeLicenceButton } from '../components/RevokeLicenceButton'
 import { ServiceTile } from '../components/ServiceTile'
+import { SubscriptionFormModal } from '../components/SubscriptionFormModal'
 import { SubscriptionStatusBadge } from '../components/StatusBadge'
 import { UserAvatar } from '../components/UserAvatar'
 import { errorText } from '../lib/errors'
@@ -19,9 +30,12 @@ import { subscriptionTypeLabels } from '../lib/labels'
 import { canManageSubscription } from '../lib/permissions'
 import { costText, isOpen, seatsText } from '../lib/subscriptions'
 
-// SubscriptionPage (manager, employee): the subscription and its licences.
-// Holders are listed only to whoever manages the subscription: for anyone
-// else the server returns just their own licence. The admin's card is К4.
+// SubscriptionPage: the subscription and its licences. Holders are listed
+// only to whoever manages the subscription (the admin, a manager of the
+// owning department): for anyone else the server returns just their own
+// licence. The admin also edits, cancels and deletes it. The payment history
+// with «Добавить платёж» (К5) and the change history from the audit (К7) go
+// under the two cards.
 export function SubscriptionPage() {
   const id = Number(useParams().id)
   const me = useMe()
@@ -50,6 +64,7 @@ export function SubscriptionPage() {
             {[s.vendor, s.category].filter(Boolean).join(' · ')}
           </span>
         }
+        extra={me.role === 'admin' && <AdminActions subscription={s} />}
       />
       <div className="two-columns">
         <Card variant="borderless" title="Подписка">
@@ -79,6 +94,68 @@ export function SubscriptionPage() {
         </Card>
         {manages ? <Holders subscription={s} /> : <MyLicence subscription={s} />}
       </div>
+    </>
+  )
+}
+
+// AdminActions: «Редактировать», «Отменить подписку» and «Удалить». Both
+// cancelling and deleting revoke every licence, so they ask first.
+function AdminActions({ subscription: s }: { subscription: SubscriptionDTO }) {
+  const { message, modal } = App.useApp()
+  const navigate = useNavigate()
+  const [editing, setEditing] = useState(false)
+  const update = useUpdateSubscription()
+  const remove = useDeleteSubscription()
+  const licences =
+    s.seats_used > 0
+      ? `Все выданные лицензии (${s.seats_used}) будут отозваны.`
+      : 'Лицензий по ней не выдано.'
+
+  const cancel = () =>
+    modal.confirm({
+      title: `Отменить подписку «${s.name}»?`,
+      content: `${licences} Вернуть её можно, сменив статус в редактировании, но лицензии придётся выдать заново.`,
+      okText: 'Отменить подписку',
+      okButtonProps: { danger: true },
+      cancelText: 'Не отменять',
+      onOk: () =>
+        update.mutateAsync({ id: s.id, body: { status: 'cancelled' } }).then(
+          () => message.success('Подписка отменена'),
+          (err: unknown) => message.error(errorText(err)),
+        ),
+    })
+
+  const del = () =>
+    modal.confirm({
+      title: `Удалить подписку «${s.name}»?`,
+      content: `${licences} Подписка пропадёт из всех списков; история платежей и аудит останутся.`,
+      okText: 'Удалить',
+      okButtonProps: { danger: true },
+      cancelText: 'Оставить',
+      onOk: () =>
+        remove.mutateAsync(s.id).then(
+          () => {
+            message.success('Подписка удалена')
+            navigate('/subscriptions', { replace: true })
+          },
+          (err: unknown) => message.error(errorText(err)),
+        ),
+    })
+
+  return (
+    <>
+      <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>
+        Редактировать
+      </Button>
+      {s.status !== 'cancelled' && (
+        <Button icon={<StopOutlined />} onClick={cancel}>
+          Отменить подписку
+        </Button>
+      )}
+      <Button danger icon={<DeleteOutlined />} onClick={del}>
+        Удалить
+      </Button>
+      <SubscriptionFormModal open={editing} onClose={() => setEditing(false)} subscription={s} />
     </>
   )
 }

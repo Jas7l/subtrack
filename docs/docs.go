@@ -4739,6 +4739,10 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 1
                 },
+                "assigned_by_name": {
+                    "type": "string",
+                    "example": "Администратор"
+                },
                 "id": {
                     "type": "integer",
                     "example": 40
@@ -4750,6 +4754,10 @@ const docTemplate = `{
                 "revoked_by": {
                     "type": "integer",
                     "example": 1
+                },
+                "revoked_by_name": {
+                    "type": "string",
+                    "example": "Иванов Иван Сергеевич"
                 },
                 "status": {
                     "type": "string",

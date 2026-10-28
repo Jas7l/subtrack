@@ -3,13 +3,18 @@ import { Alert, App, Button, Form, Input, Modal } from 'antd'
 import { useState } from 'react'
 import { useApproveRequest, useRejectRequest } from '../api/requests'
 import type { ApproveBody, RequestDTO } from '../api/types'
+import { useMe } from '../auth/AuthContext'
 import { errorText } from '../lib/errors'
+import { AdminApproveModal } from './AdminApproveModal'
 
 type Mode = 'approve' | 'reject'
 
-// DecisionButtons: the head's «Одобрить» and «Отклонить» with a comment,
-// required only for a rejection. On an error the modal stays open.
+// DecisionButtons: «Одобрить» and «Отклонить» with a comment, required only
+// for a rejection. The admin's approval also picks the subscription
+// (AdminApproveModal). On an error the modal stays open.
 export function DecisionButtons({ request }: { request: RequestDTO }) {
+  const me = useMe()
+  const admin = me.role === 'admin'
   const { message } = App.useApp()
   const [mode, setMode] = useState<Mode | null>(null)
   const [form] = Form.useForm<{ comment?: string }>()
@@ -44,14 +49,17 @@ export function DecisionButtons({ request }: { request: RequestDTO }) {
   return (
     <>
       <Button type="primary" icon={<CheckOutlined />} onClick={() => setMode('approve')}>
-        Одобрить
+        {admin ? 'Одобрить…' : 'Одобрить'}
       </Button>
       <Button danger icon={<CloseOutlined />} onClick={() => setMode('reject')}>
         Отклонить
       </Button>
+      {admin && (
+        <AdminApproveModal open={mode === 'approve'} onClose={close} request={request} />
+      )}
       <Modal
         title={mode === 'reject' ? 'Отклонить заявку' : 'Одобрить заявку'}
-        open={mode !== null}
+        open={mode === 'reject' || (mode === 'approve' && !admin)}
         onCancel={close}
         onOk={() => form.submit()}
         okText={mode === 'reject' ? 'Отклонить' : 'Одобрить'}

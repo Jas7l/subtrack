@@ -1,7 +1,9 @@
 import { ApiError } from '../api/client'
 
 // Known server descriptions (English, without the "service: " prefix) →
-// Russian text. Unknown ones fall back to a text by status.
+// Russian text. Some carry details after the known part ("department is not
+// empty: it still has 3 active users…", "unknown currency XYZ"): they match
+// by that prefix. Unknown ones fall back to a text by status.
 const known: Record<string, string> = {
   'invalid email or password': 'Неверный email или пароль',
   'user is blocked': 'Учётная запись заблокирована',
@@ -43,6 +45,19 @@ const known: Record<string, string> = {
     'Решать по заявкам отдела может только его начальник',
   'insufficient permissions: you are in no department': 'Вы не привязаны к отделу',
   'subscription_id and user_id are required': 'Выберите сотрудника',
+  'password must be at least 8 characters': 'Пароль — не короче 8 символов',
+  'password must be at most 72 bytes': 'Пароль слишком длинный',
+  'seats_total is required for a group subscription': 'Укажите число мест',
+  'seats_total must be at least 1': 'Мест должно быть не меньше одного',
+  'an individual subscription has exactly 1 seat; use type group for more':
+    'У индивидуальной подписки ровно одно место: для нескольких выберите «Групповая»',
+  'an enterprise subscription has no seat limit; omit seats_total':
+    'У корпоративной подписки нет ограничения мест',
+  'end_date must not be before start_date': 'Окончание не может быть раньше начала',
+  'approve with either subscription_id or subscription, not both or neither':
+    'Выберите подписку или создайте новую',
+  'at least one field must be provided': 'Вы ничего не изменили',
+  'department not found': 'Отдел не найден',
   'assignment not found': 'Лицензия не найдена',
   'user not found': 'Пользователь не найден',
   'request not found': 'Заявка не найдена',
@@ -58,9 +73,23 @@ const byStatus: Record<number, string> = {
   409: 'Действие невозможно в текущем состоянии',
 }
 
+function knownText(description: string): string | undefined {
+  if (known[description]) return known[description]
+  let best = ''
+  for (const key of Object.keys(known)) {
+    const tail = description.charAt(key.length)
+    if (key.length > best.length && description.startsWith(key) && (tail === ':' || tail === ' ')) {
+      best = key
+    }
+  }
+  return best ? known[best] : undefined
+}
+
 export function errorText(err: unknown): string {
   if (err instanceof ApiError) {
-    return known[err.description] ?? byStatus[err.status] ?? 'Ошибка сервера, попробуйте позже'
+    return (
+      knownText(err.description) ?? byStatus[err.status] ?? 'Ошибка сервера, попробуйте позже'
+    )
   }
   return 'Что-то пошло не так'
 }

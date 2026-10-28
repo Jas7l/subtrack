@@ -454,6 +454,24 @@ body {
   margin-bottom: 20px;
 }
 
+/* The admin's approval: subscriptions matching the request. */
+.approve-matches {
+  margin-bottom: 20px;
+}
+
+.approve-match {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Two form fields side by side in a modal. */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
 /* Dashboard: stat cards, then the inbox and the pie side by side. */
 .stat-grid {
   display: grid;

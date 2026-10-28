@@ -208,9 +208,10 @@ func (f *fakeRepo) Assign(_ context.Context, subID, userID, actorID int64) (doma
 	}
 	s.SeatsUsed++
 	f.subs[subID] = s
+	assignedBy := f.users[actorID].FullName
 	a := domain.Assignment{
 		ID: f.nextAsg, SubscriptionID: subID, UserID: userID, Status: domain.AssignmentActive,
-		AssignedBy: &actorID, AssignedAt: time.Now(),
+		AssignedBy: &actorID, AssignedByName: &assignedBy, AssignedAt: time.Now(),
 		SubscriptionName: s.Name, SubscriptionDepartmentID: s.DepartmentID, UserName: f.users[userID].FullName,
 	}
 	f.nextAsg++
@@ -226,7 +227,8 @@ func (f *fakeRepo) Revoke(_ context.Context, id, actorID int64) (domain.Assignme
 		return domain.Assignment{}, storage.ErrNotFound
 	}
 	now := time.Now()
-	a.Status, a.RevokedAt, a.RevokedBy = domain.AssignmentRevoked, &now, &actorID
+	revokedBy := f.users[actorID].FullName
+	a.Status, a.RevokedAt, a.RevokedBy, a.RevokedByName = domain.AssignmentRevoked, &now, &actorID, &revokedBy
 	f.asg[id] = a
 	s := f.subs[a.SubscriptionID]
 	s.SeatsUsed--

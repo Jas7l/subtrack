@@ -11,9 +11,12 @@ export function inboxStatus(me: MeDTO, isHead: boolean): 'pending_manager' | 'pe
   return null
 }
 
-// canDecide: the head of the request's department, while it waits for them.
-// The admin's decisions are К4.
+// canDecide: the head of the request's department while it waits for them;
+// the admin on pending_admin, and on pending_manager too — that one is theirs
+// only when the department has no head, otherwise the server answers 409
+// «waits for the head», shown as is.
 export function canDecide(me: MeDTO, isHead: boolean, r: RequestDTO): boolean {
+  if (me.role === 'admin') return r.status === 'pending_admin' || r.status === 'pending_manager'
   return (
     isHead &&
     r.status === 'pending_manager' &&
@@ -22,10 +25,11 @@ export function canDecide(me: MeDTO, isHead: boolean, r: RequestDTO): boolean {
   )
 }
 
-// canManageSubscription: who hands out and revokes licences. Any manager of
-// the owning department (not only its head); company-wide subscriptions are
-// the admin's (К4).
+// canManageSubscription: who hands out and revokes licences. The admin —
+// any subscription; a manager — the owning department's (not only its head);
+// company-wide subscriptions are the admin's.
 export function canManageSubscription(me: MeDTO, sub: SubscriptionDTO): boolean {
+  if (me.role === 'admin') return true
   return (
     me.role === 'manager' && me.department_id !== null && sub.department_id === me.department_id
   )

@@ -63,14 +63,22 @@ export function useCancelRequest() {
 }
 
 // A decision refreshes the request even when it fails: a 409 «already
-// decided» means the card is stale and its buttons must go.
+// decided» means the card is stale and its buttons must go. The admin's
+// approval also hands out a licence, maybe in a new subscription.
 export function useApproveRequest() {
   const queryClient = useQueryClient()
   return useMutation({
     // The server rejects an empty body, so there is always an object.
     mutationFn: ({ id, body }: { id: number; body: ApproveBody }) =>
       request<RequestDTO>(`/requests/${id}/approve`, { method: 'POST', body }),
-    onSettled: () => afterChange(queryClient),
+    onSettled: (_data, _err, { body }) => {
+      afterChange(queryClient)
+      if (body.subscription_id !== undefined || body.subscription !== undefined) {
+        for (const key of ['subscriptions', 'assignments', 'analytics']) {
+          void queryClient.invalidateQueries({ queryKey: [key] })
+        }
+      }
+    },
   })
 }
 

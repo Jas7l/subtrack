@@ -163,8 +163,7 @@ export function RequestPage() {
     steps.findIndex((s) => s.status === 'process' || s.status === 'error'),
   )
 
-  // Buttons by role and status (CLIENT_PLAN.md, section 6); the admin's
-  // decisions are К4.
+  // Buttons by role and status (CLIENT_PLAN.md, section 6).
   const actions = canDecide(me, isHead, r) ? (
     <DecisionButtons request={r} />
   ) : (

@@ -777,6 +777,9 @@ definitions:
       assigned_by:
         example: 1
         type: integer
+      assigned_by_name:
+        example: Администратор
+        type: string
       id:
         example: 40
         type: integer
@@ -786,6 +789,9 @@ definitions:
       revoked_by:
         example: 1
         type: integer
+      revoked_by_name:
+        example: Иванов Иван Сергеевич
+        type: string
       status:
         enum:
         - active
