@@ -15,6 +15,7 @@ import { MySubscriptionsPage } from './pages/MySubscriptionsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { RecommendationsPage } from './pages/RecommendationsPage'
 import { RequestPage } from './pages/RequestPage'
 import { RequestsPage } from './pages/RequestsPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -41,18 +42,13 @@ const ADMIN: readonly Role[] = ['admin']
 
 // Pages of the app and who may open them. Until a page is built (no `Page`)
 // it is a stub that names the stage it belongs to (CLIENT_PLAN.md, section 7).
-// `builtFor` limits a built page to some roles: the others still see the
-// stub (the admin's versions come later).
 interface PageDef {
   path: string
   roles: readonly Role[]
   title: string | Partial<Record<Role, string>>
   stage: string
   Page?: ComponentType
-  builtFor?: readonly Role[]
 }
-
-const MANAGER: readonly Role[] = ['manager']
 
 const pages: PageDef[] = [
   {
@@ -78,7 +74,6 @@ const pages: PageDef[] = [
     title: { admin: 'Дашборд', manager: 'Бюджет отдела' },
     stage: 'К6',
     Page: DashboardPage,
-    builtFor: MANAGER,
   },
   {
     path: '/subscriptions',
@@ -121,7 +116,6 @@ const pages: PageDef[] = [
     title: 'Прогноз бюджета',
     stage: 'К6',
     Page: ForecastPage,
-    builtFor: MANAGER,
   },
   { path: '/departments', roles: ADMIN, title: 'Отделы', stage: 'К4', Page: DepartmentsPage },
   { path: '/assignments', roles: ADMIN, title: 'Лицензии', stage: 'К4', Page: AssignmentsPage },
@@ -133,7 +127,13 @@ const pages: PageDef[] = [
     Page: TransactionsPage,
   },
   { path: '/settings', roles: ADMIN, title: 'Настройки', stage: 'К5', Page: SettingsPage },
-  { path: '/recommendations', roles: ADMIN, title: 'Рекомендации', stage: 'К6' },
+  {
+    path: '/recommendations',
+    roles: ADMIN,
+    title: 'Рекомендации',
+    stage: 'К6',
+    Page: RecommendationsPage,
+  },
   { path: '/audit', roles: ADMIN, title: 'Аудит', stage: 'К7' },
 ]
 
@@ -143,11 +143,11 @@ const pageSpin = (
   </div>
 )
 
-// RolePage renders the page built for the user's role, or a stub.
+// RolePage renders the page, or a stub until it is built.
 function RolePage({ page }: { page: PageDef }) {
   const me = useMe()
   const { Page } = page
-  if (Page && (!page.builtFor || page.builtFor.includes(me.role))) {
+  if (Page) {
     return (
       <Suspense fallback={pageSpin}>
         <Page />

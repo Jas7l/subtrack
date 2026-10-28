@@ -3,8 +3,10 @@ import { Alert, Card, Segmented, Spin, Table, type TableProps } from 'antd'
 import { useForecast } from '../api/analytics'
 import type { ForecastMonthDTO } from '../api/types'
 import { useMe } from '../auth/AuthContext'
+import { DepartmentSelect } from '../components/DepartmentSelect'
 import { ForecastChart } from '../components/ForecastChart'
 import { PageHeader } from '../components/PageHeader'
+import { PrintButton } from '../components/PrintButton'
 import { NoDepartment } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
 import { monthTitle } from '../lib/charts'
@@ -48,28 +50,46 @@ const columns: TableProps<ForecastMonthDTO>['columns'] = [
   },
 ]
 
-// ForecastPage (manager): the department's expected spending by month, from
-// the next payment dates and billing periods. The admin's version is К6.
+// ForecastPage: expected spending by month, from the next payment dates and
+// billing periods. A manager sees their department; the admin the company
+// or a department they pick.
 export function ForecastPage() {
   const me = useMe()
   const url = useUrlState()
+  const admin = me.role === 'admin'
   const months = PERIODS.includes(Number(url.get('months'))) ? Number(url.get('months')) : DEFAULT_PERIOD
-  const forecast = useForecast(months)
+  const departmentId = Number(url.get('department_id')) || undefined
+  const forecast = useForecast(months, admin && departmentId ? { department_id: departmentId } : {})
 
-  if (me.department_id === null) return <NoDepartment title="Прогноз бюджета" />
+  if (!admin && me.department_id === null) return <NoDepartment title="Прогноз бюджета" />
 
   const f = forecast.data
   return (
     <>
       <PageHeader
         title="Прогноз бюджета"
-        subtitle="Платежи по подпискам отдела: по датам платежей и периодам оплаты"
+        subtitle={
+          admin
+            ? 'Платежи по подпискам: по датам платежей и периодам оплаты'
+            : 'Платежи по подпискам отдела: по датам платежей и периодам оплаты'
+        }
         extra={
-          <Segmented
-            value={months}
-            onChange={(v) => url.set({ months: v === DEFAULT_PERIOD ? null : v })}
-            options={PERIODS.map((p) => ({ value: p, label: `${p} мес.` }))}
-          />
+          <>
+            {admin && (
+              <DepartmentSelect
+                value={departmentId}
+                onChange={(id) => url.set({ department_id: id ?? null })}
+                placeholder="Все отделы"
+                style={{ width: 220 }}
+              />
+            )}
+            <Segmented
+              value={months}
+              onChange={(v) => url.set({ months: v === DEFAULT_PERIOD ? null : v })}
+              options={PERIODS.map((p) => ({ value: p, label: `${p} мес.` }))}
+            />
+            <PrintButton />
+          </>
         }
       />
       {forecast.error && (

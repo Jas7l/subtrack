@@ -13,15 +13,23 @@ import { useAuth, useMe } from '../auth/AuthContext'
 import { CategoryPie } from '../components/CategoryPie'
 import { ForecastChart } from '../components/ForecastChart'
 import { PageHeader } from '../components/PageHeader'
+import { PrintButton } from '../components/PrintButton'
 import { NoDepartment } from '../components/QueryState'
 import { ServiceTile } from '../components/ServiceTile'
 import { StatCard } from '../components/StatCard'
 import { errorText } from '../lib/errors'
 import { formatMoney, fromNow, plural } from '../lib/format'
+import { AdminDashboard } from './AdminDashboard'
 
-// DashboardPage (manager): the department's budget. The admin's dashboard
-// with payments and recommendations is К6.
+// DashboardPage: the admin's dashboard for the company, or the manager's
+// budget of their department.
 export function DashboardPage() {
+  const me = useMe()
+  return me.role === 'admin' ? <AdminDashboard /> : <ManagerDashboard />
+}
+
+// ManagerDashboard: the department's budget.
+function ManagerDashboard() {
   const me = useMe()
   const { department, isHead, departmentLoading } = useAuth()
   const navigate = useNavigate()
@@ -48,6 +56,7 @@ export function DashboardPage() {
       <PageHeader
         title="Бюджет отдела"
         subtitle={department ? `${department.name}: расходы на подписки и лицензии` : undefined}
+        extra={<PrintButton />}
       />
 
       <div className="stat-grid">

@@ -639,3 +639,218 @@ body {
   color: #f2f3f5;
   text-align: right;
 }
+
+/* Admin dashboard: rows of cards of different widths (3:2 as on the mockup). */
+.dash-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.dash-row > * {
+  min-width: 0;
+}
+
+.dash-wide {
+  flex: 3 1 520px;
+}
+
+.dash-narrow {
+  flex: 2 1 340px;
+}
+
+.dash-half {
+  flex: 1 1 420px;
+}
+
+.stat-card-link {
+  display: block;
+  color: inherit;
+}
+
+.stat-card-link > .stat-card {
+  height: 100%;
+}
+
+.stat-card-link:hover .stat-card {
+  outline: 1px solid #4e5058;
+}
+
+.stat-hint .ant-progress {
+  margin: 4px 0 2px;
+}
+
+/* «Ближайшие события» and «Свободные места». */
+.event-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.event {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 4px;
+  border-bottom: 1px solid #3f4147;
+  color: inherit;
+}
+
+.event:last-child {
+  border-bottom: 0;
+}
+
+.event:hover .event-text {
+  color: #f2f3f5;
+}
+
+.event-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.event-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #dbdee1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-when {
+  font-size: 14px;
+  font-weight: 700;
+  color: #949ba4;
+  white-space: nowrap;
+}
+
+/* Recommendations. */
+.rec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rec {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #313338;
+}
+
+.rec-compact {
+  padding: 14px;
+}
+
+.rec-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 18px;
+}
+
+.rec-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rec-kind {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rec-text {
+  font-size: 14px;
+  color: #949ba4;
+}
+
+.rec-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+
+.sub-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.rec-savings {
+  flex: none;
+  text-align: right;
+}
+
+.rec-savings-value {
+  font-weight: 800;
+  color: #a3e635;
+  white-space: nowrap;
+}
+
+.savings-banner .ant-card-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* PDF (window.print): the page as on screen, dark, without the menu and
+   buttons. The page margins are zero so no white frame is left around the
+   dark background; the padding of the main area takes their place. */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  html,
+  body,
+  #root {
+    background: #1e1f22 !important;
+  }
+
+  .app-main {
+    max-width: none;
+    padding: 12mm !important;
+  }
+
+  .app-header,
+  .no-print,
+  .page-header .ant-btn,
+  .page-header .ant-segmented,
+  .recharts-tooltip-wrapper {
+    display: none !important;
+  }
+
+  .ant-card {
+    break-inside: avoid;
+  }
+
+  /* Charts keep the width they had on screen: scale them to the page. */
+  .recharts-responsive-container,
+  .recharts-wrapper,
+  .recharts-surface {
+    width: 100% !important;
+    height: auto !important;
+  }
+}

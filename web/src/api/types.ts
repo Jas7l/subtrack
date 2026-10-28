@@ -306,6 +306,52 @@ export interface SliceDTO {
   share_pct: number
 }
 
+// One department of GET /analytics/by-department; department_id null — the
+// company-wide subscriptions (then active_users and cost_per_user_rub are
+// null too).
+export interface DepartmentRowDTO {
+  department_id: number | null
+  name: string
+  subscriptions: number
+  monthly_cost_rub: string
+  seats_total: number
+  seats_used: number
+  utilization_pct: number | null
+  active_users: number | null
+  cost_per_user_rub: string | null
+}
+
+// One row of GET /analytics/top-subscriptions.
+export interface TopRowDTO {
+  subscription_id: number
+  name: string
+  vendor: string
+  department_name: string | null
+  status: SubscriptionStatus
+  monthly_cost_rub: string
+  annual_cost_rub: string
+  // null for enterprise.
+  seats_total: number | null
+  seats_used: number
+  utilization_pct: number | null
+  // null when no licence is handed out.
+  cost_per_licence_rub: string | null
+}
+
+export interface SpendingMonthDTO {
+  // "YYYY-MM"
+  month: string
+  amount_rub: string
+  payments: number
+}
+
+export interface SpendingResponse {
+  from: string
+  to: string
+  months: SpendingMonthDTO[]
+  total_rub: string
+}
+
 export interface ForecastMonthDTO {
   // "YYYY-MM"
   month: string
@@ -383,4 +429,27 @@ export interface NotificationSettingsDTO {
 export interface NotificationSettingsBody {
   expiring_days: number
   payment_days: number
+}
+
+export type RecommendationType =
+  | 'unused_seats'
+  | 'no_holders'
+  | 'duplicate_vendor'
+  | 'individual_to_group'
+  | 'enterprise_low_usage'
+  | 'annual_billing'
+  | 'expired_with_holders'
+
+export interface RecommendationDTO {
+  type: RecommendationType
+  subscription_ids: number[]
+  title: string
+  text: string
+  // null: the saving cannot be computed.
+  savings_rub_year: string | null
+}
+
+export interface RecommendationsResponse {
+  items: RecommendationDTO[]
+  total_savings_rub_year: string
 }
