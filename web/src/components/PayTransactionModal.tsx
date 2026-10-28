@@ -4,6 +4,7 @@ import type { PayTransactionBody, TransactionDTO } from '../api/types'
 import { errorText } from '../lib/errors'
 import { formatDate, formatMoney } from '../lib/format'
 import { paymentMethods } from '../lib/transactions'
+import { ModalForm } from './ModalForm'
 
 interface Values {
   payment_method?: string
@@ -80,7 +81,7 @@ export function PayTransactionModal({
       {pay.error && (
         <Alert type="error" showIcon title={errorText(pay.error)} style={{ marginBottom: 16 }} />
       )}
-      <Form
+      <ModalForm
         form={form}
         layout="vertical"
         requiredMark={false}
@@ -96,7 +97,7 @@ export function PayTransactionModal({
         <Form.Item name="invoice_number" label="Номер счёта">
           <Input placeholder="Например, INV-2026-114" maxLength={200} />
         </Form.Item>
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

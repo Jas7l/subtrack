@@ -16,6 +16,7 @@ import { useCreateTransaction } from '../api/transactions'
 import type { CreateTransactionBody, SubscriptionDTO } from '../api/types'
 import { errorText } from '../lib/errors'
 import { paymentMethods } from '../lib/transactions'
+import { ModalForm } from './ModalForm'
 import { SubscriptionSelect } from './SubscriptionSelect'
 
 interface Values {
@@ -91,7 +92,7 @@ export function TransactionFormModal({
       {create.error && (
         <Alert type="error" showIcon title={errorText(create.error)} style={{ marginBottom: 16 }} />
       )}
-      <Form
+      <ModalForm
         form={form}
         layout="vertical"
         requiredMark={false}
@@ -155,7 +156,7 @@ export function TransactionFormModal({
         <Form.Item<Values> name="invoice_number" label="Номер счёта">
           <Input placeholder="Например, INV-2026-090" maxLength={200} />
         </Form.Item>
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

@@ -1,6 +1,6 @@
-import { Alert, Badge, Card, Select, Spin, Table, Tabs, type TableProps } from 'antd'
+import { Alert, Badge, Button, Card, Select, Spin, Table, Tabs, type TableProps } from 'antd'
 import { useNavigate } from 'react-router'
-import { useRequests } from '../api/requests'
+import { useHeadlessRequests, useRequests } from '../api/requests'
 import type { RequestDTO, RequestStatus } from '../api/types'
 import { useAuth, useMe } from '../auth/AuthContext'
 import { DepartmentSelect } from '../components/DepartmentSelect'
@@ -10,10 +10,10 @@ import { RequestStatusBadge } from '../components/StatusBadge'
 import { UserAvatar } from '../components/UserAvatar'
 import { UserSelect } from '../components/UserSelect'
 import { errorText } from '../lib/errors'
-import { formatDay, formatMoney } from '../lib/format'
+import { formatDay, formatMoney, plural } from '../lib/format'
 import { requestStatusLabels } from '../lib/labels'
 import { inboxStatus } from '../lib/permissions'
-import { useUrlState } from '../lib/urlState'
+import { useLastPage, useUrlState } from '../lib/urlState'
 
 const columns: NonNullable<TableProps<RequestDTO>['columns']> = [
   {
@@ -94,8 +94,10 @@ export function RequestsPage() {
     limit: url.pageSize,
     offset: url.offset,
   })
+  useLastPage(url, requests.data?.total)
   // The inbox count stays on its tab while «Все» is open.
   const inbox = useRequests({ status: waiting ?? undefined, limit: 1 })
+  const headless = useHeadlessRequests(admin)
 
   if (departmentLoading) {
     return (
@@ -106,6 +108,31 @@ export function RequestsPage() {
   }
 
   const shown = admin ? columns : columns.filter((c) => c.key !== 'department')
+  // pending_manager of departments without a head wait for the admin too;
+  // «Все» shows them (by department when they are all in one).
+  const n = headless.count
+  const headlessNote = n > 0 && (
+    <Alert
+      type="warning"
+      showIcon
+      title={`${n} ${plural(n, 'заявка ждёт', 'заявки ждут', 'заявок ждут')} начальника отдела, но начальника в отделе нет — решение за вами`}
+      action={
+        <Button
+          size="small"
+          onClick={() =>
+            url.set({
+              tab: 'all',
+              status: 'pending_manager',
+              department_id: headless.departments.length === 1 ? headless.departments[0] : null,
+            })
+          }
+        >
+          Показать
+        </Button>
+      }
+      style={{ marginBottom: 16 }}
+    />
+  )
   const table = (
     <>
       {admin && tab === 'all' && (
@@ -184,10 +211,15 @@ export function RequestsPage() {
               label: (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   {admin ? 'Ждут меня' : 'Входящие'}{' '}
-                  <Badge count={inbox.data?.total ?? 0} size="small" />
+                  <Badge count={(inbox.data?.total ?? 0) + headless.count} size="small" />
                 </span>
               ),
-              children: table,
+              children: (
+                <>
+                  {headlessNote}
+                  {table}
+                </>
+              ),
             },
             { key: 'all', label: admin ? 'Все' : 'Все заявки отдела', children: table },
           ]}

@@ -14,8 +14,10 @@ export function inboxStatus(me: MeDTO, isHead: boolean): 'pending_manager' | 'pe
 // canDecide: the head of the request's department while it waits for them;
 // the admin on pending_admin, and on pending_manager too — that one is theirs
 // only when the department has no head, otherwise the server answers 409
-// «waits for the head», shown as is.
+// «waits for the head», shown as is. Nobody decides their own request (made
+// before they became the head or the admin): the server answers 403.
 export function canDecide(me: MeDTO, isHead: boolean, r: RequestDTO): boolean {
+  if (r.requester_id === me.id) return false
   if (me.role === 'admin') return r.status === 'pending_admin' || r.status === 'pending_manager'
   return (
     isHead &&

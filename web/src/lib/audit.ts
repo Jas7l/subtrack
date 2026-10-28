@@ -9,7 +9,7 @@ import type {
   TransactionStatus,
 } from '../api/types'
 import type { Tone } from '../theme'
-import { formatDate, formatMoney } from './format'
+import { formatAmount, formatDate, formatMoney } from './format'
 import {
   billingPeriodLabels,
   requestStatusLabels,
@@ -156,6 +156,7 @@ const fieldLabels: Record<string, string> = {
   payment_date: 'Дата платежа',
   seats_total: 'Мест',
   licences_revoked: 'Отозвано лицензий',
+  requests_cancelled: 'Отменено заявок',
   subscription_id: 'Подписка',
   user_id: 'Сотрудник',
   stage: 'Решение',
@@ -193,7 +194,9 @@ function statusText(entity: AuditEntityType, status: string): string {
 // department ids.
 export function detailRows(e: AuditEntryDTO, departments: Map<number, string>): DetailRow[] {
   const d = e.details
-  const currency = str(d.currency) ?? 'RUB'
+  // An edit of the cost alone does not name the currency: the amount is then
+  // shown without one rather than as roubles.
+  const currency = str(d.currency)
   const known = Object.keys(fieldLabels).filter((k) => k in d)
   const unknown = Object.keys(d).filter((k) => !(k in fieldLabels) && !hidden.has(k))
   return [...known, ...unknown].map((key) => {
@@ -226,7 +229,7 @@ export function detailRows(e: AuditEntryDTO, departments: Map<number, string>): 
         return row(billingPeriodLabels[v as BillingPeriod] ?? String(v))
       case 'cost':
       case 'amount':
-        return row(formatMoney(String(v), currency))
+        return row(currency ? formatMoney(String(v), currency) : formatAmount(String(v)))
       case 'department_id':
         return row(departments.get(Number(v)) ?? `#${String(v)}`)
       case 'head_id':

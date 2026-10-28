@@ -86,9 +86,16 @@ export function ProfilePage() {
             <Form.Item
               name="next"
               label="Новый пароль"
+              dependencies={['current']}
               rules={[
                 { required: true, message: 'Введите новый пароль' },
                 { min: MIN_PASSWORD, message: `Не короче ${MIN_PASSWORD} символов` },
+                ({ getFieldValue }) => ({
+                  validator: (_, value) =>
+                    !value || value !== getFieldValue('current')
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('Новый пароль должен отличаться от текущего')),
+                }),
               ]}
             >
               <Input.Password autoComplete="new-password" />

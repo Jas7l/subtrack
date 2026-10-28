@@ -98,7 +98,9 @@ export async function download(path: string, query?: Query): Promise<void> {
   document.body.appendChild(link)
   link.click()
   link.remove()
-  URL.revokeObjectURL(link.href)
+  // Some browsers (Safari, older Firefox) start the download after click()
+  // returns; revoking the URL at once could cut it off.
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000)
 }
 
 function fileName(disposition: string | null): string | null {

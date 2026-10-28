@@ -1,9 +1,9 @@
 import { AutoComplete, DatePicker, Form, Input, InputNumber, Select, Space } from 'antd'
-import type { Dayjs } from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import { useByCategory } from '../api/analytics'
 import { useCurrencies } from '../api/currencies'
 import type { BillingPeriod, SubscriptionType } from '../api/types'
-import { billingPeriodLabels, subscriptionTypeLabels } from '../lib/labels'
+import { billingPeriodLabels, subscriptionStatusLabels, subscriptionTypeLabels } from '../lib/labels'
 import type { SubscriptionValues } from '../lib/subscriptionForm'
 import { DepartmentSelect } from './DepartmentSelect'
 
@@ -27,14 +27,18 @@ const typeHints: Record<SubscriptionType, string> = {
 // Form (creating, editing, approving a request with a new one). The seats
 // follow the type: individual — one, hidden; group — required; enterprise —
 // none. `seatsUsed` (editing) is the lowest seat count the server accepts.
+// An `expired` one (editing) is renewed by moving its end date forward and
+// picking «Действует».
 export function SubscriptionFields({
   editing = false,
   seatsUsed = 0,
   hideName = false,
+  expired = false,
 }: {
   editing?: boolean
   seatsUsed?: number
   hideName?: boolean
+  expired?: boolean
 }) {
   const type = Form.useWatch<SubscriptionType | undefined>('type')
   const currencies = useCurrencies()
@@ -176,10 +180,28 @@ export function SubscriptionFields({
         <Form.Item<SubscriptionValues>
           name="status"
           label="Статус"
-          extra="«Отменена» отзывает все лицензии подписки"
+          extra={
+            expired
+              ? 'Чтобы продлить: перенесите окончание и выберите «Действует». Прошедшая дата платежа сдвинется вперёд.'
+              : '«Отменена» отзывает все лицензии подписки. При возврате в «Действует» прошедшая дата платежа сдвинется вперёд.'
+          }
+          dependencies={['end_date']}
+          rules={[
+            ({ getFieldValue }) => ({
+              validator: (_, status: SubscriptionValues['status']) => {
+                const end: Dayjs | null | undefined = getFieldValue('end_date')
+                return expired && status === 'active' && end && end.isBefore(dayjs(), 'day')
+                  ? Promise.reject(new Error('Окончание уже прошло: перенесите его на будущее'))
+                  : Promise.resolve()
+              },
+            }),
+          ]}
         >
           <Select
             options={[
+              ...(expired
+                ? [{ value: 'expired', label: subscriptionStatusLabels.expired, disabled: true }]
+                : []),
               { value: 'active', label: 'Действует' },
               { value: 'cancelled', label: 'Отменена' },
             ]}

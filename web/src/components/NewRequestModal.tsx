@@ -4,6 +4,7 @@ import { useCreateRequest } from '../api/requests'
 import type { CreateRequestBody, RequestDTO } from '../api/types'
 import { useAuth, useMe } from '../auth/AuthContext'
 import { errorText } from '../lib/errors'
+import { ModalForm } from './ModalForm'
 
 interface Values {
   name: string
@@ -49,7 +50,6 @@ export function NewRequestModal({
     create.mutate(body, {
       onSuccess: (req) => {
         message.success('Заявка отправлена')
-        form.resetFields()
         onClose()
         onCreated?.(req)
       },
@@ -76,7 +76,7 @@ export function NewRequestModal({
       {create.error && (
         <Alert type="error" showIcon title={errorText(create.error)} style={{ marginBottom: 16 }} />
       )}
-      <Form
+      <ModalForm
         form={form}
         layout="vertical"
         requiredMark={false}
@@ -106,6 +106,7 @@ export function NewRequestModal({
               <InputNumber<string>
                 stringMode
                 min="0"
+                max="999999999999.99"
                 precision={2}
                 placeholder="Если знаете"
                 style={{ width: '100%' }}
@@ -124,7 +125,7 @@ export function NewRequestModal({
             </Form.Item>
           </Space.Compact>
         </Form.Item>
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

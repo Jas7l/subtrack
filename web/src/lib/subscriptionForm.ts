@@ -10,7 +10,9 @@ import type {
 import { parseDate } from './format'
 
 // The values of the subscription form (components/SubscriptionFields.tsx).
-// department_id undefined — company-wide; status is shown only on editing.
+// department_id undefined — company-wide; status is shown only on editing,
+// and expired only as the status an expired subscription has (it cannot be
+// picked).
 export interface SubscriptionValues {
   name: string
   vendor?: string
@@ -24,7 +26,7 @@ export interface SubscriptionValues {
   next_payment_date?: Dayjs | null
   department_id?: number
   seats_total?: number | null
-  status?: 'active' | 'cancelled'
+  status?: 'active' | 'cancelled' | 'expired'
 }
 
 const day = (d: Dayjs) => d.format('YYYY-MM-DD')
@@ -64,8 +66,9 @@ export function valuesFromSubscription(s: SubscriptionDTO): SubscriptionValues {
     next_payment_date: s.next_payment_date ? parseDate(s.next_payment_date) : null,
     department_id: s.department_id ?? undefined,
     seats_total: s.type === 'group' ? s.seats_total : null,
-    // expiring_soon and expired are the scheduler's: «not cancelled».
-    status: s.status === 'cancelled' ? 'cancelled' : 'active',
+    // expiring_soon is the scheduler's and still «active»; expired stays
+    // as it is until it is renewed (back to active) or cancelled.
+    status: s.status === 'expiring_soon' ? 'active' : s.status,
   }
 }
 
@@ -112,6 +115,8 @@ export function toPatch(v: SubscriptionValues, s: SubscriptionDTO): UpdateSubscr
   if (v.type === 'group' && v.seats_total && (v.type !== s.type || v.seats_total !== s.seats_total)) {
     p.seats_total = v.seats_total
   }
-  if (v.status && v.status !== was.status) p.status = v.status
+  // Renewing an expired subscription (or bringing a cancelled one back) is
+  // active; a past next payment date is moved forward by the server.
+  if (v.status && v.status !== was.status && v.status !== 'expired') p.status = v.status
   return p
 }

@@ -15,7 +15,7 @@ import { UserSelect } from '../components/UserSelect'
 import { errorText } from '../lib/errors'
 import { formatDay } from '../lib/format'
 import { assignmentStatusLabels } from '../lib/labels'
-import { useUrlState } from '../lib/urlState'
+import { useLastPage, useUrlState } from '../lib/urlState'
 
 const columns: TableProps<AssignmentDTO>['columns'] = [
   {
@@ -98,6 +98,7 @@ export function AssignmentsPage() {
   }
   const filtered = Object.values(filters).some(Boolean)
   const assignments = useAssignments({ ...filters, limit: url.pageSize, offset: url.offset })
+  useLastPage(url, assignments.data?.total)
 
   return (
     <>

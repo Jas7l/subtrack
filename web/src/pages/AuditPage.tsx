@@ -21,7 +21,7 @@ import {
 } from '../lib/audit'
 import { errorText } from '../lib/errors'
 import { formatMoment, parseDate } from '../lib/format'
-import { useUrlState } from '../lib/urlState'
+import { useLastPage, useUrlState } from '../lib/urlState'
 
 const entityOptions = (Object.keys(entityLabels) as AuditEntityType[]).map((t) => ({
   value: t,
@@ -45,6 +45,7 @@ export function AuditPage() {
   }
   const filtered = Object.values(filters).some(Boolean)
   const audit = useAudit({ ...filters, limit: url.pageSize, offset: url.offset })
+  useLastPage(url, audit.data?.total)
 
   // The actions of the chosen entity type, or all of them.
   const actionOptions = Object.keys(actionLabels)

@@ -34,6 +34,10 @@ export const compactRub = (n: number) => `${compact.format(n)} ₽`
 export const monthLabel = (month: string) => dayjs(month, 'YYYY-MM').format('MMM YY')
 export const monthTitle = (month: string) => dayjs(month, 'YYYY-MM').format('MMMM YYYY')
 
+// isCurrentMonth: in a forecast, the current month is what is left of it —
+// the payment dates already passed have become payments in the register.
+export const isCurrentMonth = (month: string) => month === dayjs().format('YYYY-MM')
+
 export interface PieSlice {
   name: string
   share: number

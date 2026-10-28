@@ -9,7 +9,7 @@ import { PageHeader } from '../components/PageHeader'
 import { SearchInput } from '../components/SearchInput'
 import { UserAvatar } from '../components/UserAvatar'
 import { errorText } from '../lib/errors'
-import { useUrlState } from '../lib/urlState'
+import { useLastPage, useUrlState } from '../lib/urlState'
 
 // DepartmentsPage (admin): departments with their head and head count.
 // There is no department card: a row links to its people and subscriptions.
@@ -20,6 +20,7 @@ export function DepartmentsPage() {
   const url = useUrlState()
   const q = url.get('q')
   const departments = useDepartments({ q, limit: url.pageSize, offset: url.offset })
+  useLastPage(url, departments.data?.total)
   const remove = useDeleteDepartment()
   // undefined — closed, null — a new department.
   const [editing, setEditing] = useState<DepartmentDTO | null>()

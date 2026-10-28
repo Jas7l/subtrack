@@ -9,7 +9,7 @@ import { PageHeader } from '../components/PageHeader'
 import { PrintButton } from '../components/PrintButton'
 import { NoDepartment } from '../components/QueryState'
 import { StatCard } from '../components/StatCard'
-import { monthTitle } from '../lib/charts'
+import { isCurrentMonth, monthTitle } from '../lib/charts'
 import { errorText } from '../lib/errors'
 import { formatMoney, plural } from '../lib/format'
 import { useUrlState } from '../lib/urlState'
@@ -21,7 +21,12 @@ const columns: TableProps<ForecastMonthDTO>['columns'] = [
   {
     title: 'Месяц',
     key: 'month',
-    render: (_, m) => <span style={{ textTransform: 'capitalize' }}>{monthTitle(m.month)}</span>,
+    render: (_, m) => (
+      <>
+        <span style={{ textTransform: 'capitalize' }}>{monthTitle(m.month)}</span>
+        {isCurrentMonth(m.month) && <span className="cell-sub"> (остаток)</span>}
+      </>
+    ),
   },
   {
     title: 'По графику платежей',
@@ -131,7 +136,8 @@ export function ForecastPage() {
             <ForecastChart months={f.months} />
             <p className="cell-sub" style={{ margin: '12px 0 0' }}>
               Квартальные и годовые подписки оплачиваются разом, поэтому в отдельные месяцы
-              бывают всплески.
+              бывают всплески. Текущий месяц — остаток: платежи с уже прошедшей датой есть в
+              реестре платежей и в прогноз не входят.
             </p>
           </Card>
           <Card variant="borderless" styles={{ body: { padding: 0 } }}>

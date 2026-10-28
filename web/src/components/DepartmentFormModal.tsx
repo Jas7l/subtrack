@@ -2,6 +2,7 @@ import { Alert, App, Form, Input, Modal } from 'antd'
 import { useCreateDepartment, useUpdateDepartment } from '../api/departments'
 import type { CreateDepartmentBody, DepartmentDTO, UpdateDepartmentBody } from '../api/types'
 import { errorText } from '../lib/errors'
+import { ModalForm } from './ModalForm'
 import { UserSelect } from './UserSelect'
 
 interface Values {
@@ -79,7 +80,7 @@ export function DepartmentFormModal({
       {mutation.error && (
         <Alert type="error" showIcon title={errorText(mutation.error)} style={{ marginBottom: 16 }} />
       )}
-      <Form
+      <ModalForm
         form={form}
         layout="vertical"
         requiredMark={false}
@@ -100,7 +101,7 @@ export function DepartmentFormModal({
         >
           <UserSelect query={HEADS} allowClear placeholder="Без начальника" />
         </Form.Item>
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

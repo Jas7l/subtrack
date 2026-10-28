@@ -5,6 +5,7 @@ import { useMe } from '../auth/AuthContext'
 import { errorText } from '../lib/errors'
 import { roleLabels } from '../lib/labels'
 import { DepartmentSelect } from './DepartmentSelect'
+import { ModalForm } from './ModalForm'
 
 interface Values {
   full_name: string
@@ -102,7 +103,7 @@ export function UserFormModal({
       {mutation.error && (
         <Alert type="error" showIcon title={errorText(mutation.error)} style={{ marginBottom: 16 }} />
       )}
-      <Form
+      <ModalForm
         form={form}
         layout="vertical"
         requiredMark={false}
@@ -169,7 +170,7 @@ export function UserFormModal({
             <DepartmentSelect />
           </Form.Item>
         </div>
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

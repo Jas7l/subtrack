@@ -1,7 +1,7 @@
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons'
 import { Badge, Dropdown, Menu, type MenuProps } from 'antd'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
-import { usePendingRequestsCount } from '../api/requests'
+import { useHeadlessRequests, usePendingRequestsCount } from '../api/requests'
 import { useAuth, useMe } from '../auth/AuthContext'
 import { Logo } from '../components/Logo'
 import { NotificationBell } from '../components/NotificationBell'
@@ -26,6 +26,7 @@ export function AppLayout() {
   const navigate = useNavigate()
 
   const pending = usePendingRequestsCount(inboxStatus(me, isHead))
+  const headless = useHeadlessRequests(me.role === 'admin')
 
   const nav = navByRole[me.role]
   const leaves = nav.flatMap((item) => (isGroup(item) ? item.children : [item]))
@@ -36,7 +37,9 @@ export function AppLayout() {
     label: (
       <Link to={leaf.path} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         {leaf.label}
-        {leaf.requestsBadge && <Badge count={pending.data ?? 0} size="small" />}
+        {leaf.requestsBadge && (
+          <Badge count={(pending.data ?? 0) + headless.count} size="small" />
+        )}
       </Link>
     ),
   })

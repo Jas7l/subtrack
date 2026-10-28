@@ -2,6 +2,7 @@ import { Alert, App, Form, Modal } from 'antd'
 import { useCreateAssignment } from '../api/assignments'
 import type { SubscriptionDTO, UserDTO } from '../api/types'
 import { errorText } from '../lib/errors'
+import { ModalForm } from './ModalForm'
 import { SubscriptionSelect } from './SubscriptionSelect'
 import { UserSelect } from './UserSelect'
 
@@ -47,7 +48,6 @@ export function GrantLicenceModal({
       {
         onSuccess: (a) => {
           message.success(`Лицензия «${a.subscription_name}» выдана: ${a.user_name}`)
-          form.resetFields()
           close()
         },
       },
@@ -72,7 +72,7 @@ export function GrantLicenceModal({
       {create.error && (
         <Alert type="error" showIcon title={errorText(create.error)} style={{ marginBottom: 16 }} />
       )}
-      <Form form={form} layout="vertical" requiredMark={false} onFinish={submit}>
+      <ModalForm form={form} layout="vertical" requiredMark={false} onFinish={submit}>
         {!subscription && (
           <Form.Item
             name="subscription_id"
@@ -91,7 +91,7 @@ export function GrantLicenceModal({
             <UserSelect exclude={holders} />
           </Form.Item>
         )}
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

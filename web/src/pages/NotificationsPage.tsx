@@ -1,28 +1,31 @@
 import { CheckOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Card, Empty, Pagination, Segmented, Spin } from 'antd'
-import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { useMarkAllRead, useMarkRead, useNotifications } from '../api/notifications'
+import { useMarkAllRead, useNotifications } from '../api/notifications'
 import type { NotificationDTO } from '../api/types'
 import { NotificationItem } from '../components/NotificationItem'
 import { PageHeader } from '../components/PageHeader'
 import { errorText } from '../lib/errors'
-import { notificationLink } from '../lib/notifications'
+import { useOpenNotification } from '../lib/notifications'
+import { useLastPage, useUrlState } from '../lib/urlState'
 
-const PAGE_SIZE = 20
-
+// NotificationsPage: all of the user's notifications, newest first. The
+// filter and the page are in the address, as on the other lists: back from
+// what a notification opened returns to the same place.
 export function NotificationsPage() {
   const navigate = useNavigate()
   const { message } = App.useApp()
-  const [unreadOnly, setUnreadOnly] = useState(false)
-  const [page, setPage] = useState(1)
+  const url = useUrlState()
+  const unreadOnly = url.get('unread') === '1'
 
   const list = useNotifications({
     unread: unreadOnly || undefined,
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
+    limit: url.pageSize,
+    offset: url.offset,
   })
-  const markRead = useMarkRead()
+  // Reading the unread ones of the last page empties it.
+  useLastPage(url, list.data?.total)
+  const openNotification = useOpenNotification()
   const markAll = useMarkAllRead()
 
   const unread = list.data?.unread ?? 0
@@ -31,8 +34,7 @@ export function NotificationsPage() {
   // A click marks the notification read and opens what it is about; old
   // notifications without a link just get marked.
   const open = (n: NotificationDTO) => {
-    if (!n.is_read) markRead.mutate(n.id)
-    const link = notificationLink(n)
+    const link = openNotification(n)
     if (link) navigate(link)
   }
 
@@ -49,10 +51,7 @@ export function NotificationsPage() {
                 { value: 'all', label: 'Все' },
                 { value: 'unread', label: 'Непрочитанные' },
               ]}
-              onChange={(v) => {
-                setUnreadOnly(v === 'unread')
-                setPage(1)
-              }}
+              onChange={(v) => url.set({ unread: v === 'unread' ? 1 : null })}
             />
             <Button
               icon={<CheckOutlined />}
@@ -86,12 +85,12 @@ export function NotificationsPage() {
       </Card>
       <Pagination
         style={{ marginTop: 20, justifyContent: 'center' }}
-        current={page}
-        pageSize={PAGE_SIZE}
+        current={url.page}
+        pageSize={url.pageSize}
         total={list.data?.total ?? 0}
         hideOnSinglePage
         showSizeChanger={false}
-        onChange={setPage}
+        onChange={(page) => url.set({ page })}
       />
     </>
   )

@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { useApproveRequest } from '../api/requests'
 import { useSubscriptions } from '../api/subscriptions'
 import type { ApproveBody, NewSubscriptionBody, RequestDTO } from '../api/types'
-import { errorText } from '../lib/errors'
+import { errorText, requestMovedOn } from '../lib/errors'
 import { toCreateBody, valuesFromRequest, type SubscriptionValues } from '../lib/subscriptionForm'
 import { seatsText } from '../lib/subscriptions'
+import { ModalForm } from './ModalForm'
 import { SubscriptionStatusBadge } from './StatusBadge'
 import { SubscriptionFields } from './SubscriptionFields'
 import { SubscriptionSelect } from './SubscriptionSelect'
@@ -52,6 +53,11 @@ export function AdminApproveModal({
         onSuccess: () => {
           message.success('Заявка одобрена, лицензия выдана')
           close()
+        },
+        // The card reloads without the decision buttons, and this modal
+        // with its alert goes too (see DecisionButtons).
+        onError: (e) => {
+          if (requestMovedOn(e)) message.error(errorText(e))
         },
       },
     )
@@ -117,7 +123,7 @@ export function AdminApproveModal({
         ]}
         style={{ marginBottom: 20 }}
       />
-      <Form
+      <ModalForm
         form={form}
         layout="vertical"
         requiredMark={false}
@@ -172,7 +178,7 @@ export function AdminApproveModal({
         <Form.Item name="comment" label="Комментарий (необязательно)">
           <Input.TextArea rows={2} maxLength={2000} />
         </Form.Item>
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

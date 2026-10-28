@@ -15,6 +15,7 @@ import {
   useUpdateSubscription,
 } from '../api/subscriptions'
 import { useTransactions } from '../api/transactions'
+import { useUsers } from '../api/users'
 import type { AssignmentDTO, SubscriptionDTO } from '../api/types'
 import { useMe } from '../auth/AuthContext'
 import { AuditHistory } from '../components/AuditHistory'
@@ -169,26 +170,44 @@ function AdminActions({ subscription: s }: { subscription: SubscriptionDTO }) {
   )
 }
 
-// A department has far fewer than 200 holders of one subscription.
+// The most a list returns at once; a subscription with more holders shows
+// the first ones and says so.
 const ALL = { limit: 200 }
 
 function Holders({ subscription: s }: { subscription: SubscriptionDTO }) {
+  const me = useMe()
   const [granting, setGranting] = useState(false)
   const assignments = useAssignments({ subscription_id: s.id, status: 'active', ...ALL })
   const items = useMemo(() => assignments.data?.items ?? [], [assignments.data])
+  const total = assignments.data?.total ?? 0
   const holders = useMemo(() => new Set(items.map((a) => a.user_id)), [items])
   const noSeats = s.seats_free === 0
+  // A manager opens the cards of their own department's people only (the
+  // admin may have given a licence to someone else): /users is theirs.
+  const manager = me.role === 'manager'
+  const colleagues = useUsers(ALL, manager)
+  const linked = (id: number) =>
+    !manager || (colleagues.data?.items.some((u) => u.id === id) ?? false)
 
   const columns: TableProps<AssignmentDTO>['columns'] = [
     {
       title: 'Сотрудник',
       key: 'user',
-      render: (_, a) => (
-        <Link to={`/users/${a.user_id}`} className="cell-service">
-          <UserAvatar id={a.user_id} name={a.user_name} size={32} />
-          <span className="cell-title">{a.user_name}</span>
-        </Link>
-      ),
+      render: (_, a) => {
+        const who = (
+          <>
+            <UserAvatar id={a.user_id} name={a.user_name} size={32} />
+            <span className="cell-title">{a.user_name}</span>
+          </>
+        )
+        return linked(a.user_id) ? (
+          <Link to={`/users/${a.user_id}`} className="cell-service">
+            {who}
+          </Link>
+        ) : (
+          <span className="cell-service">{who}</span>
+        )
+      },
     },
     { title: 'Выдана', key: 'assigned', render: (_, a) => formatDay(a.assigned_at) },
     { key: 'actions', align: 'right', render: (_, a) => <RevokeLicenceButton assignment={a} /> },
@@ -197,7 +216,7 @@ function Holders({ subscription: s }: { subscription: SubscriptionDTO }) {
   return (
     <Card
       variant="borderless"
-      title={`Кто пользуется · ${items.length}`}
+      title={`Кто пользуется · ${total}`}
       extra={
         isOpen(s) && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
@@ -223,6 +242,11 @@ function Holders({ subscription: s }: { subscription: SubscriptionDTO }) {
           dataSource={items}
           loading={assignments.isFetching}
           pagination={false}
+          footer={
+            total > items.length
+              ? () => <span className="cell-sub">Показаны первые {items.length} из {total}</span>
+              : undefined
+          }
         />
       )}
       <GrantLicenceModal

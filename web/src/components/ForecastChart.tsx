@@ -4,6 +4,7 @@ import {
   axisProps,
   compactRub,
   gridProps,
+  isCurrentMonth,
   monthLabel,
   monthTitle,
   toNumber,
@@ -40,7 +41,9 @@ export function ForecastChart({ months, height = 320 }: { months: ForecastMonthD
         <YAxis tickFormatter={compactRub} width={72} {...axisProps} />
         <Tooltip
           {...tooltipProps}
-          labelFormatter={(m) => monthTitle(String(m))}
+          labelFormatter={(m) =>
+            monthTitle(String(m)) + (isCurrentMonth(String(m)) ? ' (остаток)' : '')
+          }
           formatter={(_, key, item) => {
             const m = (item.payload as Row).source
             return key === 'scheduled'

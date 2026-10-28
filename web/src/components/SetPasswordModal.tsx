@@ -2,6 +2,7 @@ import { Alert, App, Form, Input, Modal } from 'antd'
 import type { UserDTO } from '../api/types'
 import { useSetPassword } from '../api/users'
 import { errorText } from '../lib/errors'
+import { ModalForm } from './ModalForm'
 
 interface Values {
   password: string
@@ -60,7 +61,7 @@ export function SetPasswordModal({
           style={{ marginBottom: 16 }}
         />
       )}
-      <Form form={form} layout="vertical" requiredMark={false} onFinish={submit}>
+      <ModalForm form={form} layout="vertical" requiredMark={false} onFinish={submit}>
         <Form.Item
           name="password"
           label="Новый пароль"
@@ -88,7 +89,7 @@ export function SetPasswordModal({
         >
           <Input.Password autoComplete="new-password" />
         </Form.Item>
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

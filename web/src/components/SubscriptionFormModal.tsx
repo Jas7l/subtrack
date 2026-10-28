@@ -9,6 +9,7 @@ import {
   valuesFromSubscription,
   type SubscriptionValues,
 } from '../lib/subscriptionForm'
+import { ModalForm } from './ModalForm'
 import { SubscriptionFields } from './SubscriptionFields'
 
 // SubscriptionFormModal creates a subscription, or edits `subscription`
@@ -77,15 +78,19 @@ export function SubscriptionFormModal({
       {mutation.error && (
         <Alert type="error" showIcon title={errorText(mutation.error)} style={{ marginBottom: 16 }} />
       )}
-      <Form
+      <ModalForm
         form={form}
         layout="vertical"
         requiredMark={false}
         initialValues={subscription ? valuesFromSubscription(subscription) : newSubscriptionValues()}
         onFinish={submit}
       >
-        <SubscriptionFields editing={!!subscription} seatsUsed={subscription?.seats_used ?? 0} />
-      </Form>
+        <SubscriptionFields
+          editing={!!subscription}
+          seatsUsed={subscription?.seats_used ?? 0}
+          expired={subscription?.status === 'expired'}
+        />
+      </ModalForm>
     </Modal>
   )
 }

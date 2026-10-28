@@ -11,7 +11,7 @@ import { TransactionsTable } from '../components/TransactionsTable'
 import { errorText } from '../lib/errors'
 import { parseDate, plural } from '../lib/format'
 import { transactionStatusLabels } from '../lib/labels'
-import { useUrlState } from '../lib/urlState'
+import { useLastPage, useUrlState } from '../lib/urlState'
 
 const statusOptions = (Object.keys(transactionStatusLabels) as TransactionStatus[]).map((s) => ({
   value: s,
@@ -45,6 +45,7 @@ export function TransactionsPage() {
     limit: url.pageSize,
     offset: url.offset,
   })
+  useLastPage(url, transactions.data?.total)
   // The counters do not depend on the page: only `total` is read.
   const pending = useTransactions({ status: 'pending', limit: 1 })
   const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD')

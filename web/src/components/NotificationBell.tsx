@@ -1,27 +1,28 @@
 import { BellOutlined } from '@ant-design/icons'
-import { Badge, Button, Empty, Popover, Spin } from 'antd'
+import { App, Badge, Button, Empty, Popover, Spin } from 'antd'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { useLatestNotifications, useMarkAllRead, useMarkRead } from '../api/notifications'
+import { useLatestNotifications, useMarkAllRead } from '../api/notifications'
 import type { NotificationDTO } from '../api/types'
-import { notificationLink } from '../lib/notifications'
+import { errorText } from '../lib/errors'
+import { useOpenNotification } from '../lib/notifications'
 import { colors } from '../theme'
 import { NotificationItem } from './NotificationItem'
 
 // NotificationBell: the unread counter and a popup with the latest ten.
 export function NotificationBell() {
   const navigate = useNavigate()
+  const { message } = App.useApp()
   const [open, setOpen] = useState(false)
   const latest = useLatestNotifications()
-  const markRead = useMarkRead()
+  const openNotification = useOpenNotification()
   const markAll = useMarkAllRead()
 
   const unread = latest.data?.unread ?? 0
   const items = latest.data?.items ?? []
 
   const openItem = (n: NotificationDTO) => {
-    if (!n.is_read) markRead.mutate(n.id)
-    const link = notificationLink(n)
+    const link = openNotification(n)
     setOpen(false)
     if (link) navigate(link)
   }
@@ -35,7 +36,9 @@ export function NotificationBell() {
           size="small"
           disabled={unread === 0}
           loading={markAll.isPending}
-          onClick={() => markAll.mutate()}
+          onClick={() =>
+            markAll.mutate(undefined, { onError: (err) => message.error(errorText(err)) })
+          }
         >
           Прочитать все
         </Button>

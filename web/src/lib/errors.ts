@@ -10,6 +10,7 @@ const known: Record<string, string> = {
   'authentication required': 'Нужно войти в систему',
   'insufficient permissions': 'Недостаточно прав',
   'current password is incorrect': 'Текущий пароль указан неверно',
+  'new password must differ from the current one': 'Новый пароль должен отличаться от текущего',
   'email is already taken': 'Этот email уже занят',
   'you cannot block yourself or remove your own admin role':
     'Нельзя заблокировать себя или снять с себя роль администратора',
@@ -50,11 +51,14 @@ const known: Record<string, string> = {
   'missing required fields': 'Заполните обязательные поля',
   'amount must be a non-negative amount with at most 2 decimals, like 1500.00':
     'Сумма — не меньше нуля, не больше 2 знаков после запятой',
+  'estimated_cost must be a non-negative amount with at most 2 decimals, like 1500.00':
+    'Стоимость — не меньше нуля, не больше 2 знаков после запятой',
   'payment_date is required': 'Укажите дату платежа',
   'subscription_id is required': 'Выберите подписку',
   'unknown subscription or currency': 'Такой подписки или валюты нет',
   'insufficient permissions: only the head of the department reviews its requests':
     'Решать по заявкам отдела может только его начальник',
+  'insufficient permissions: you cannot decide your own request': 'Нельзя решать по своей заявке',
   'insufficient permissions: you are in no department': 'Вы не привязаны к отделу',
   'subscription_id and user_id are required': 'Выберите сотрудника',
   'password must be at least 8 characters': 'Пароль — не короче 8 символов',
@@ -97,6 +101,12 @@ function knownText(description: string): string | undefined {
     }
   }
   return best ? known[best] : undefined
+}
+
+// requestMovedOn: a decision came too late — the request was decided,
+// cancelled or moved to the other stage meanwhile (409 «the request …»).
+export function requestMovedOn(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 409 && err.description.startsWith('the request ')
 }
 
 export function errorText(err: unknown): string {

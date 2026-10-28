@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
 
 export const PAGE_SIZE = 20
@@ -38,4 +39,19 @@ export function useUrlState() {
   })
 
   return { get, set, page, pageSize, offset: (page - 1) * pageSize, pagination }
+}
+
+export type UrlState = ReturnType<typeof useUrlState>
+
+// useLastPage moves a list that is past its last page — its last rows were
+// deleted, decided or otherwise taken away from under it — back to the last
+// one. The table's pager would show the last page number over no rows and
+// never ask for it.
+export function useLastPage(url: UrlState, total: number | undefined) {
+  const { page, pageSize, set } = url
+  useEffect(() => {
+    if (total && page > 1 && (page - 1) * pageSize >= total) {
+      set({ page: Math.ceil(total / pageSize) })
+    }
+  }, [total, page, pageSize, set])
 }

@@ -56,7 +56,7 @@ export function RecommendationsPage() {
             <div>
               <div className="stat-label">Потенциальная экономия</div>
               <div className="stat-value" style={{ color: tones.accent.color }}>
-                {formatMoney(recs.data.total_savings_rub_year)} в год
+                {formatMoney(recs.data.total_savings_rub_year)} за год
               </div>
             </div>
             <div className="cell-sub" style={{ marginLeft: 'auto' }}>

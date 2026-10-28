@@ -16,7 +16,7 @@ import { errorText } from '../lib/errors'
 import { formatDate, parseDate } from '../lib/format'
 import { subscriptionStatusLabels, subscriptionTypeLabels } from '../lib/labels'
 import { costText, seatsText } from '../lib/subscriptions'
-import { useUrlState } from '../lib/urlState'
+import { useLastPage, useUrlState } from '../lib/urlState'
 
 // No sortable columns: the API has no sort parameter.
 const columns: TableProps<SubscriptionDTO>['columns'] = [
@@ -89,6 +89,7 @@ export function SubscriptionsPage() {
   const filtered = Object.values(filters).some(Boolean)
 
   const subscriptions = useSubscriptions({ ...filters, limit: url.pageSize, offset: url.offset })
+  useLastPage(url, subscriptions.data?.total)
 
   const runExport = () => {
     setExporting(true)

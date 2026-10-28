@@ -16,7 +16,7 @@ import { UserAvatar } from '../components/UserAvatar'
 import { UserFormModal } from '../components/UserFormModal'
 import { errorText } from '../lib/errors'
 import { roleLabels } from '../lib/labels'
-import { useUrlState } from '../lib/urlState'
+import { useLastPage, useUrlState } from '../lib/urlState'
 
 const baseColumns: NonNullable<TableProps<UserDTO>['columns']> = [
   {
@@ -71,6 +71,7 @@ export function UsersPage() {
     { ...filters, limit: url.pageSize, offset: url.offset },
     admin || me.department_id !== null,
   )
+  useLastPage(url, users.data?.total)
 
   if (!admin && me.department_id === null) return <NoDepartment title="Сотрудники отдела" />
 

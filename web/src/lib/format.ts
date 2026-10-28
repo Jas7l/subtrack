@@ -7,15 +7,23 @@ dayjs.extend(relativeTime)
 
 const currencySymbols: Record<string, string> = { RUB: '₽', USD: '$', EUR: '€', CNY: '¥' }
 
-const amountFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 })
+const wholeFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 })
+const centsFormat = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-// formatMoney shows a server amount ("15000.00") as «15 000 ₽». It only
-// formats: sums are computed by the server, never added up here.
+// formatAmount shows a server amount without its currency: «15 000»
+// ("15000.00"), or with both kopecks when there are any: «1 500,50»
+// ("1500.50"). It only formats: sums are computed by the server, never added
+// up here.
+export function formatAmount(amount: string): string {
+  const n = Number(amount)
+  if (!Number.isFinite(n)) return amount
+  return Number.isInteger(n) ? wholeFormat.format(n) : centsFormat.format(n)
+}
+
+// formatMoney is formatAmount with the currency: «15 000 ₽», «54,99 $».
 export function formatMoney(amount: string | null | undefined, currency = 'RUB'): string {
   if (amount === null || amount === undefined || amount === '') return '—'
-  const n = Number(amount)
-  const text = Number.isFinite(n) ? amountFormat.format(n) : amount
-  return `${text} ${currencySymbols[currency] ?? currency}`
+  return `${formatAmount(amount)} ${currencySymbols[currency] ?? currency}`
 }
 
 // Dates come as "YYYY-MM-DD" and are parsed as local dates: new Date() would

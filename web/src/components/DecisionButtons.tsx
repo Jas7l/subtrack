@@ -4,14 +4,17 @@ import { useState } from 'react'
 import { useApproveRequest, useRejectRequest } from '../api/requests'
 import type { ApproveBody, RequestDTO } from '../api/types'
 import { useMe } from '../auth/AuthContext'
-import { errorText } from '../lib/errors'
+import { errorText, requestMovedOn } from '../lib/errors'
 import { AdminApproveModal } from './AdminApproveModal'
+import { ModalForm } from './ModalForm'
 
 type Mode = 'approve' | 'reject'
 
 // DecisionButtons: «Одобрить» and «Отклонить» with a comment, required only
 // for a rejection. The admin's approval also picks the subscription
-// (AdminApproveModal). On an error the modal stays open.
+// (AdminApproveModal). On an error the modal stays open, except when the
+// request moved on meanwhile: the card then reloads without these buttons,
+// the modal goes with them, and the reason is shown as a message.
 export function DecisionButtons({ request }: { request: RequestDTO }) {
   const me = useMe()
   const admin = me.role === 'admin'
@@ -30,20 +33,26 @@ export function DecisionButtons({ request }: { request: RequestDTO }) {
 
   const done = (text: string) => () => {
     message.success(text)
-    form.resetFields()
     setMode(null)
+  }
+
+  const failed = (e: unknown) => {
+    if (requestMovedOn(e)) message.error(errorText(e))
   }
 
   const submit = (values: { comment?: string }) => {
     const comment = values.comment?.trim() ?? ''
     if (mode === 'reject') {
-      reject.mutate({ id: request.id, comment }, { onSuccess: done('Заявка отклонена') })
+      reject.mutate(
+        { id: request.id, comment },
+        { onSuccess: done('Заявка отклонена'), onError: failed },
+      )
       return
     }
     // The server rejects an empty body: an approval without a comment is {}.
     const body: ApproveBody = {}
     if (comment) body.comment = comment
-    approve.mutate({ id: request.id, body }, { onSuccess: done('Заявка одобрена') })
+    approve.mutate({ id: request.id, body }, { onSuccess: done('Заявка одобрена'), onError: failed })
   }
 
   return (
@@ -76,7 +85,7 @@ export function DecisionButtons({ request }: { request: RequestDTO }) {
         {mutation.error && (
           <Alert type="error" showIcon title={errorText(mutation.error)} style={{ marginBottom: 16 }} />
         )}
-        <Form form={form} layout="vertical" requiredMark={false} onFinish={submit}>
+        <ModalForm form={form} layout="vertical" requiredMark={false} onFinish={submit}>
           <Form.Item
             name="comment"
             label={mode === 'reject' ? 'Причина отказа' : 'Комментарий (необязательно)'}
@@ -88,7 +97,7 @@ export function DecisionButtons({ request }: { request: RequestDTO }) {
           >
             <Input.TextArea rows={3} maxLength={2000} autoFocus />
           </Form.Item>
-        </Form>
+        </ModalForm>
       </Modal>
     </>
   )

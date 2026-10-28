@@ -2,6 +2,7 @@ import { Alert, App, Form, Input, InputNumber, Modal } from 'antd'
 import { useCreateCurrency, useUpdateCurrency } from '../api/currencies'
 import type { CurrencyDTO, UpdateCurrencyBody } from '../api/types'
 import { errorText } from '../lib/errors'
+import { ModalForm } from './ModalForm'
 
 interface Values {
   code: string
@@ -90,7 +91,7 @@ export function CurrencyFormModal({
           style={{ marginBottom: 16 }}
         />
       )}
-      <Form
+      <ModalForm
         form={form}
         layout="vertical"
         requiredMark={false}
@@ -141,7 +142,7 @@ export function CurrencyFormModal({
             style={{ width: '100%' }}
           />
         </Form.Item>
-      </Form>
+      </ModalForm>
     </Modal>
   )
 }

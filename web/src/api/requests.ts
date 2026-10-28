@@ -6,6 +6,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query'
 import { request, type Query } from './client'
+import { useDepartments } from './departments'
 import type { ApproveBody, CreateRequestBody, Page, RequestDTO } from './types'
 
 // usePendingRequestsCount backs the badge on «Заявки»: how many requests wait
@@ -19,6 +20,28 @@ export function usePendingRequestsCount(status: 'pending_manager' | 'pending_adm
     enabled: status !== null,
     refetchInterval: 30_000,
   })
+}
+
+// useHeadlessRequests: the admin's share of pending_manager — the requests
+// of departments left without a head while they waited (the server lets the
+// admin decide them; the inbox asks only for pending_admin). `departments`
+// are where they are, to filter the list by.
+export function useHeadlessRequests(enabled: boolean) {
+  const departments = useDepartments(undefined, enabled)
+  const headless = new Set(
+    (departments.data?.items ?? []).filter((d) => d.head_id === null).map((d) => d.id),
+  )
+  const waiting = useQuery({
+    queryKey: ['requests', 'headless'],
+    queryFn: () =>
+      request<Page<RequestDTO>>('/requests', { query: { status: 'pending_manager', limit: 200 } }),
+    enabled: enabled && departments.data !== undefined,
+    refetchInterval: 30_000,
+  })
+  const items = (waiting.data?.items ?? []).filter(
+    (r) => r.department_id === null || headless.has(r.department_id),
+  )
+  return { count: items.length, departments: [...new Set(items.map((r) => r.department_id))] }
 }
 
 export function useRequests(query: Query = {}) {

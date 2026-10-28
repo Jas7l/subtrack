@@ -11,6 +11,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons'
 import { Alert, App, Button, Card, Empty, Progress, Spin, Table, type TableProps } from 'antd'
+import dayjs from 'dayjs'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import {
@@ -44,6 +45,11 @@ import { colors, tones } from '../theme'
 // company of the thesis has a few dozen.
 const ALL_SUBS = 200
 const EVENTS = 6
+
+// The current month, the way the payment register filters it (and the
+// server counts «Оплачено в этом месяце»: by payment date).
+const monthStart = () => dayjs().startOf('month').format('YYYY-MM-DD')
+const monthEnd = () => dayjs().endOf('month').format('YYYY-MM-DD')
 
 // AdminDashboard: the company's (or one department's) spending, payments,
 // advice and what comes next. The department filter goes into every block;
@@ -269,7 +275,7 @@ function SummaryCards({ summary: s }: { summary: SummaryDTO }) {
           highlight
           label="Можно сэкономить"
           value={formatMoney(savings)}
-          hint={`в год, ${s.recommendations ?? 0} ${plural(s.recommendations ?? 0, 'рекомендация', 'рекомендации', 'рекомендаций')}`}
+          hint={`за год, ${s.recommendations ?? 0} ${plural(s.recommendations ?? 0, 'рекомендация', 'рекомендации', 'рекомендаций')}`}
           to={recsLink(s.department_id ?? undefined)}
         />
       </div>
@@ -281,7 +287,7 @@ function SummaryCards({ summary: s }: { summary: SummaryDTO }) {
             label="Оплачено в этом месяце"
             value={formatMoney(p.paid_this_month_rub)}
             hint={`${formatMoney(p.paid_this_year_rub)} с начала года`}
-            to="/transactions?tab=all&status=paid"
+            to={`/transactions?tab=all&status=paid&from=${monthStart()}&to=${monthEnd()}`}
           />
           <StatCard
             icon={<ClockCircleOutlined />}

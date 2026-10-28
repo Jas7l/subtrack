@@ -72,7 +72,7 @@ export function RecommendationCard({
         {item.savings_rub_year ? (
           <>
             <div className="rec-savings-value">{formatMoney(item.savings_rub_year)}</div>
-            <div className="cell-sub">в год</div>
+            <div className="cell-sub">за год</div>
           </>
         ) : (
           <div className="cell-sub">оценить нельзя</div>
