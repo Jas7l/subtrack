@@ -58,6 +58,10 @@ var (
 	// department) is not its department's head. Mapped to 403.
 	ErrNotHead = fmt.Errorf("%w: only the head of the department reviews its requests", auth.ErrForbidden)
 
+	// ErrOwnRequest is returned when the reviewer is the requester: someone
+	// promoted to head or admin while their request waited. Mapped to 403.
+	ErrOwnRequest = fmt.Errorf("%w: you cannot decide your own request", auth.ErrForbidden)
+
 	// ErrNotRequester is returned when someone who can see a request tries to
 	// cancel it without having made it. Mapped to 403.
 	ErrNotRequester = fmt.Errorf("%w: only the requester can cancel a request", auth.ErrForbidden)
@@ -300,7 +304,8 @@ func (s *Service) Create(ctx context.Context, actor domain.User, in CreateReques
 //   - ErrRequestNotFound when it does not exist or is outside actor's view.
 //   - ErrNotPending, ErrWaitsForAdmin, ErrWaitsForHead for the wrong stage.
 //   - ErrNotHead (403) for a manager who is not the department head;
-//     auth.ErrForbidden for an employee.
+//     ErrOwnRequest (403) for the requester; auth.ErrForbidden for an
+//     employee.
 //   - ErrCommentRequired, apperr.ErrInvalidInput for a bad verdict.
 //   - on the admin's approval, the subscription domain's errors (no free
 //     seats, subscription not found, invalid new subscription...), each with
@@ -362,6 +367,9 @@ func (s *Service) decideAsManager(ctx context.Context, actor domain.User, id int
 	default:
 		return domain.Request{}, ErrNotPending
 	}
+	if r.RequesterID == actor.ID {
+		return domain.Request{}, ErrOwnRequest
+	}
 	head, err := s.headOf(ctx, r.DepartmentID)
 	if err != nil {
 		return domain.Request{}, err
@@ -420,6 +428,9 @@ func (s *Service) decideAsAdmin(ctx context.Context, actor domain.User, id int64
 		}
 	default:
 		return domain.Request{}, ErrNotPending
+	}
+	if r.RequesterID == actor.ID {
+		return domain.Request{}, ErrOwnRequest
 	}
 
 	d := domain.Decision{ReviewerID: actor.ID, Approve: v.Approve, Comment: v.Comment}

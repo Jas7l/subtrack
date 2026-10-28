@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"subtrack/internal/apperr"
 	"subtrack/internal/auth"
@@ -264,6 +265,73 @@ func TestUpdate(t *testing.T) {
 	active := domain.AssignmentActive
 	if _, n, _ := f.svc.ListAssignments(ctx, f.admin, domain.AssignmentFilter{Status: &active}, paging.Params{}); n != 0 {
 		t.Errorf("active licences after cancel: %d", n)
+	}
+}
+
+func TestReopenMovesPaymentDate(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	// 22:00 UTC on the 27th is already the 28th in Moscow.
+	f.svc.loc = time.FixedZone("MSK", 3*60*60)
+	f.svc.now = func() time.Time { return time.Date(2026, 10, 27, 22, 0, 0, 0, time.UTC) }
+	active, cancelled := ptr(domain.SubActive), ptr(domain.SubCancelled)
+	date := func(t *time.Time) string {
+		if t == nil {
+			return "null"
+		}
+		return t.Format(time.DateOnly)
+	}
+	// newSub creates a subscription and puts it into status, as people or
+	// the scheduler would have.
+	newSub := func(period domain.BillingPeriod, next, end string, status domain.SubscriptionStatus) domain.Subscription {
+		s := domain.Subscription{Name: "Jira", Type: domain.SubEnterprise, BillingPeriod: period, NextPaymentDate: ptr(day(next))}
+		if end != "" {
+			s.EndDate = ptr(day(end))
+		}
+		s = f.create(t, s)
+		s.Status = status
+		f.repo.subs[s.ID] = s
+		return s
+	}
+
+	tests := []struct {
+		name   string
+		sub    domain.Subscription
+		patch  domain.SubscriptionPatch
+		want   string
+		record bool // whether the audit record names the new date
+	}{
+		{"cancelled, monthly", newSub(domain.BillingMonth, "2026-03-15", "", domain.SubCancelled),
+			domain.SubscriptionPatch{Status: active}, "2026-11-15", true},
+		{"lands on today in the company's zone", newSub(domain.BillingMonth, "2026-09-27", "", domain.SubCancelled),
+			domain.SubscriptionPatch{Status: active}, "2026-11-27", true},
+		{"expired, renewed for a year", newSub(domain.BillingQuarter, "2026-04-10", "2026-06-30", domain.SubExpired),
+			domain.SubscriptionPatch{Status: active, EndDate: domain.DatePatch{Set: true, Value: ptr(day("2027-06-30"))}}, "2027-01-10", true},
+		{"next date past the new end", newSub(domain.BillingQuarter, "2026-04-10", "2026-06-30", domain.SubExpired),
+			domain.SubscriptionPatch{Status: active, EndDate: domain.DatePatch{Set: true, Value: ptr(day("2026-12-31"))}}, "null", true},
+		{"date given in the patch", newSub(domain.BillingMonth, "2026-03-15", "", domain.SubCancelled),
+			domain.SubscriptionPatch{Status: active, NextPaymentDate: domain.DatePatch{Set: true, Value: ptr(day("2026-05-01"))}}, "2026-05-01", true},
+		{"future date", newSub(domain.BillingMonth, "2026-11-03", "", domain.SubCancelled),
+			domain.SubscriptionPatch{Status: active}, "2026-11-03", false},
+		{"not a reopen", newSub(domain.BillingMonth, "2026-03-15", "", domain.SubActive),
+			domain.SubscriptionPatch{Name: ptr("Jira Cloud")}, "2026-03-15", false},
+		{"cancelling", newSub(domain.BillingMonth, "2026-03-15", "", domain.SubActive),
+			domain.SubscriptionPatch{Status: cancelled}, "2026-03-15", false},
+	}
+	for _, tt := range tests {
+		got, err := f.svc.Update(ctx, f.admin, tt.sub.ID, tt.patch)
+		if err != nil {
+			t.Errorf("%s: %v", tt.name, err)
+			continue
+		}
+		if date(got.NextPaymentDate) != tt.want {
+			t.Errorf("%s: next_payment_date %s, want %s", tt.name, date(got.NextPaymentDate), tt.want)
+		}
+		details := f.audit.Entries[len(f.audit.Entries)-1].Details
+		v, ok := details["next_payment_date"]
+		if ok != tt.record || (ok && v != nil && v != tt.want) || (ok && v == nil && tt.want != "null") {
+			t.Errorf("%s: audit next_payment_date = %v (set %v)", tt.name, v, ok)
+		}
 	}
 }
 

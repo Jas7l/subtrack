@@ -49,6 +49,10 @@ func (f *fakeRepo) GetByID(_ context.Context, id int64) (domain.Subscription, er
 	return s, nil
 }
 
+func (f *fakeRepo) GetForUpdate(ctx context.Context, id int64) (domain.Subscription, error) {
+	return f.GetByID(ctx, id)
+}
+
 func (f *fakeRepo) holds(subID, userID int64) bool {
 	for _, a := range f.asg {
 		if a.SubscriptionID == subID && a.UserID == userID && a.Status == domain.AssignmentActive {
@@ -298,7 +302,7 @@ func newFixture(t *testing.T) fixture {
 	}
 	f.repo = newFakeRepo(users)
 	f.audit = &testkit.Audit{}
-	f.svc = New(f.repo, users, fakeDepts{dev: true, design: true}, &testkit.Tx{}, f.audit)
+	f.svc = New(f.repo, users, fakeDepts{dev: true, design: true}, &testkit.Tx{}, f.audit, time.UTC)
 	return f
 }
 

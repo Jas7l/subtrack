@@ -292,7 +292,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Advice from the rules: unused seats, nobody using a subscription, several subscriptions of one vendor, individual copies of one product, an unlimited licence used by few, monthly billing for over a year, an expired subscription with licences still out. Sorted by yearly saving; advice whose saving cannot be computed comes last with savings_rub_year null.",
+                "description": "Advice from the rules: unused seats, nobody using a subscription, several subscriptions of one vendor, individual copies of one product, an unlimited licence used by few, monthly billing for over a year, an expired subscription with licences still out. Sorted by saving (over the next year, or until the end date of a subscription ending sooner); advice whose saving cannot be computed comes last with savings_rub_year null.",
                 "produces": [
                     "application/json"
                 ],

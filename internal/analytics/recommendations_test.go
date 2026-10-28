@@ -71,6 +71,28 @@ func TestRecommendations(t *testing.T) {
 	}
 }
 
+func TestRecommendationSavingsUntilEnd(t *testing.T) {
+	now := day("2026-10-23")
+	subs := []sub{
+		// 12000 a year, 3 months left (2 whole and a begun one): 3000, of
+		// which 8 of 10 seats are 2400.
+		mk(1, "1000", func(s *sub) { s.Name, s.SeatsUsed, s.EndDate = "Jira", 2, dayPtr("2027-01-10") }),
+		// Exactly 2 months left of nobody's subscription: 1000.
+		mk(2, "500", func(s *sub) { s.Name, s.SeatsUsed, s.EndDate = "Miro", 0, dayPtr("2026-12-23") }),
+		// Ends in over a year: a whole year, 6000.
+		mk(3, "500", func(s *sub) { s.Name, s.SeatsUsed, s.EndDate = "Zoom", 0, dayPtr("2028-01-01") }),
+	}
+	want := map[int64]struct{ saving, span string }{
+		1: {"2400.00", " до окончания."}, 2: {"1000.00", " до окончания."}, 3: {"6000.00", "/год."},
+	}
+	for _, r := range recommend(subs, now) {
+		w := want[r.SubscriptionIDs[0]]
+		if r.SavingsRUB == nil || *r.SavingsRUB != w.saving || !strings.HasSuffix(r.Text, w.span) {
+			t.Errorf("%s %v: saving %v, text %q; want %s, %q", r.Type, r.SubscriptionIDs, r.SavingsRUB, r.Text, w.saving, w.span)
+		}
+	}
+}
+
 func fmtIDs(ids []int64) string {
 	parts := make([]string, 0, len(ids))
 	for _, id := range ids {

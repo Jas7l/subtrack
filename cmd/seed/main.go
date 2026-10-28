@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"subtrack/internal/config"
+	"subtrack/internal/domain"
 )
 
 type client struct {
@@ -283,32 +284,21 @@ var subscriptions = []subSeed{
 		cost: "120000.00", currency: "RUB", period: "year", start: monthsAgo(23, 9), holders: everyone},
 }
 
-func step(t time.Time, period string, k int) time.Time {
-	switch period {
-	case "quarter":
-		return t.AddDate(0, 3*k, 0)
-	case "year":
-		return t.AddDate(k, 0, 0)
-	default:
-		return t.AddDate(0, k, 0)
-	}
-}
-
 // schedule splits the subscription's billing dates into the past ones, paid
 // by hand here, and the next payment date (nil when it would fall after the
-// end, or the subscription is cancelled).
+// end, or the subscription is cancelled). The dates go from the start one
+// period at a time, the way the scheduler moves next_payment_date, so a start
+// on the 29th-31st gives the same days the server would.
 func schedule(s subSeed) (paid []time.Time, next *time.Time) {
 	stop := today
 	if s.stopPaying != nil && s.stopPaying.Before(stop) {
 		stop = *s.stopPaying
 	}
-	k := 0
-	for ; ; k++ {
-		d := step(s.start, s.period, k)
-		if !d.Before(stop) || (s.end != nil && d.After(*s.end)) {
-			break
-		}
+	period := domain.BillingPeriod(s.period)
+	d := s.start
+	for d.Before(stop) && (s.end == nil || !d.After(*s.end)) {
 		paid = append(paid, d)
+		d = period.Next(d)
 	}
 	if s.cancel {
 		return paid, nil
@@ -317,11 +307,10 @@ func schedule(s subSeed) (paid []time.Time, next *time.Time) {
 		last := paid[len(paid)-1]
 		return paid[:len(paid)-1], &last
 	}
-	n := step(s.start, s.period, k)
-	if s.end != nil && n.After(*s.end) {
+	if s.end != nil && d.After(*s.end) {
 		return paid, nil
 	}
-	return paid, &n
+	return paid, &d
 }
 
 func date(t time.Time) string { return t.Format(time.DateOnly) }

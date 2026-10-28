@@ -58,7 +58,9 @@ type event struct {
 // is charged (evCharge), then a reminder goes out for a payment date within
 // PaymentDays - today's own charge included, so a 0-day window still
 // reminds on the day. An expired subscription gets no reminder; neither does
-// a payment after the end date.
+// a payment after the end date. A subscription whose end date has passed
+// expires only once every payment up to it is charged: while more than
+// maxChargesPerRun are behind, it stays open for the next run to go on.
 func plan(sub domain.Subscription, today time.Time, st domain.NotificationSettings) []event {
 	if sub.Status != domain.SubActive && sub.Status != domain.SubExpiringSoon {
 		return nil
@@ -68,12 +70,15 @@ func plan(sub domain.Subscription, today time.Time, st domain.NotificationSettin
 
 	pay := sub.NextPaymentDate
 	var due []time.Time // payment dates a reminder may be about
+	behind := false     // payment dates left for the next run
 	if pay != nil {
 		e := event{kind: evCharge, next: *pay}
-		for !e.next.After(today) && (end == nil || !e.next.After(*end)) && len(e.charge) < maxChargesPerRun {
+		owed := func() bool { return !e.next.After(today) && (end == nil || !e.next.After(*end)) }
+		for owed() && len(e.charge) < maxChargesPerRun {
 			e.charge = append(e.charge, e.next)
 			e.next = sub.BillingPeriod.Next(e.next)
 		}
+		behind = owed()
 		if len(e.charge) > 0 {
 			out = append(out, e)
 			due = append(due, e.charge[len(e.charge)-1])
@@ -82,6 +87,9 @@ func plan(sub domain.Subscription, today time.Time, st domain.NotificationSettin
 	}
 
 	if end != nil && end.Before(today) {
+		if behind {
+			return out
+		}
 		return append(out, event{kind: evExpired, status: domain.SubExpired, key: eventKey(sub.ID, evExpired, *end)})
 	}
 

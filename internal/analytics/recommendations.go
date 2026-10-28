@@ -43,9 +43,10 @@ const (
 	annualBillingAfter   = 12 // months
 )
 
-// Recommendation is one piece of advice. SavingsRUB is the yearly saving
-// when it can be computed from the data (unused seats, nobody using it),
-// nil when it depends on prices the system does not know.
+// Recommendation is one piece of advice. SavingsRUB is the saving over the
+// next year - or until the end date, when the subscription ends sooner - when
+// it can be computed from the data (unused seats, nobody using it), nil when
+// it depends on prices the system does not know.
 type Recommendation struct {
 	Type            RecommendationType
 	SubscriptionIDs []int64
@@ -56,7 +57,7 @@ type Recommendation struct {
 }
 
 // recommend runs every rule over the scope's subscriptions. The result is
-// sorted by yearly saving, largest first; advice without a computed saving
+// sorted by saving, largest first; advice without a computed saving
 // follows, in the order of the rules above.
 func recommend(subs []sub, now time.Time) []Recommendation {
 	var out []Recommendation
@@ -79,23 +80,24 @@ func recommend(subs []sub, now time.Time) []Recommendation {
 			}
 			continue
 		}
+		ahead, span := s.costAhead(now)
 		switch {
 		case s.SeatsUsed == 0 && now.Sub(s.CreatedAt) >= noHoldersGrace:
 			out = append(out, withSavings(Recommendation{
 				Type: RecNoHolders, SubscriptionIDs: []int64{s.ID},
 				Title: "Никто не пользуется: " + s.Name,
-				Text: fmt.Sprintf("У подписки «%s» нет ни одной выданной лицензии. Отмените её — сэкономите %s/год.",
-					s.Name, rubText(s.annualRUB())),
-			}, s.annualRUB()))
+				Text: fmt.Sprintf("У подписки «%s» нет ни одной выданной лицензии. Отмените её — сэкономите %s%s.",
+					s.Name, rubText(ahead), span),
+			}, ahead))
 		case s.Type == domain.SubGroup && s.SeatsTotal != nil && s.SeatsUsed > 0 &&
 			s.SeatsUsed*100 < *s.SeatsTotal*seatUsageThreshold:
 			free := *s.SeatsTotal - s.SeatsUsed
-			saving := frac(s.annualRUB(), free, *s.SeatsTotal)
+			saving := frac(ahead, free, *s.SeatsTotal)
 			out = append(out, withSavings(Recommendation{
 				Type: RecUnusedSeats, SubscriptionIDs: []int64{s.ID},
 				Title: fmt.Sprintf("Лишние места: %s", s.Name),
-				Text: fmt.Sprintf("Занято %d из %d мест %s. Сократите %d %s — сэкономите %s/год.",
-					s.SeatsUsed, *s.SeatsTotal, s.Name, free, plural(free, "место", "места", "мест"), rubText(saving)),
+				Text: fmt.Sprintf("Занято %d из %d мест %s. Сократите %d %s — сэкономите %s%s.",
+					s.SeatsUsed, *s.SeatsTotal, s.Name, free, plural(free, "место", "места", "мест"), rubText(saving), span),
 			}, saving))
 		case s.Type == domain.SubEnterprise && s.SeatsUsed > 0 && s.SeatsUsed < enterpriseLowUsage:
 			out = append(out, Recommendation{
@@ -220,6 +222,23 @@ func annual(g []sub) *big.Rat {
 		t = add(t, s.annualRUB())
 	}
 	return t
+}
+
+// costAhead is what s costs over the next year, or until its end date when
+// that comes sooner (a month begun counts whole), with how a sentence names
+// that span: "/год" or " до окончания".
+func (s sub) costAhead(now time.Time) (*big.Rat, string) {
+	if s.EndDate == nil {
+		return s.annualRUB(), "/год"
+	}
+	n := monthsBetween(now, *s.EndDate)
+	if s.EndDate.Day() != now.Day() {
+		n++
+	}
+	if n >= 12 {
+		return s.annualRUB(), "/год"
+	}
+	return frac(s.annualRUB(), max(n, 0), 12), " до окончания"
 }
 
 // monthsBetween counts whole months from a to b.

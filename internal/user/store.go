@@ -173,23 +173,38 @@ func (s *Store) List(ctx context.Context, f domain.UserFilter, limit, offset int
 	return out, total, nil
 }
 
+// Undone counts what blocking a user took back in the same transaction; it
+// is zero for any other edit.
+type Undone struct {
+	// LicencesRevoked is how many active licences were revoked.
+	LicencesRevoked int64
+	// RequestsCancelled is how many pending requests were cancelled.
+	RequestsCancelled int64
+}
+
 // Update applies a partial patch to a user and returns the row as it stands
 // afterwards. Only the fields set in p are written; updated_at is always
 // bumped. The service rejects an empty patch before calling this.
 //
-// In the same transaction it keeps two invariants:
+// In the same transaction it keeps three invariants:
 //   - the department-head one (see domain.Department): if the user headed a
 //     department and after the update is no longer an active manager of that
 //     very department, the department is left without a head;
 //   - a blocked user holds no licences: blocking revokes every active
-//     assignment of theirs on behalf of actorID and frees the seats.
+//     assignment of theirs on behalf of actorID and frees the seats;
+//   - a blocked user has no pending requests: blocking cancels them, as
+//     nobody could approve them any more.
+//
+// Lock order: the requests first, then the user, then their subscriptions
+// and assignments - the order a decision on a request takes them in (the
+// request, then the requester when the licence is handed out).
 //
 // Errors:
 //   - storage.ErrNotFound when no row has that id.
 //   - *storage.ConstraintError "users_email_key" when the new email is taken.
 //   - wrapped storage.ErrNotFound when DepartmentID names no department.
 //   - any other db error wrapped as "postgres: update user: ...".
-func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorID int64) (domain.User, error) {
+func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorID int64) (domain.User, Undone, error) {
 	sets := make([]string, 0, 6)
 	args := make([]any, 0, 6)
 	add := func(col string, v any) {
@@ -218,13 +233,24 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorI
 
 	tx, err := pg.Conn(ctx, s.pool).Begin(ctx)
 	if err != nil {
-		return domain.User{}, pg.Translate(ctx, "begin update user", err)
+		return domain.User{}, Undone{}, pg.Translate(ctx, "begin update user", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	var undone Undone
+	if p.IsActive != nil && !*p.IsActive {
+		tag, err := tx.Exec(ctx, `
+			UPDATE subtrack.requests SET status = 'cancelled', updated_at = NOW()
+			WHERE requester_id = $1 AND status IN ('pending_manager', 'pending_admin')`, id)
+		if err != nil {
+			return domain.User{}, Undone{}, pg.Translate(ctx, "update user cancel requests", err)
+		}
+		undone.RequestsCancelled = tag.RowsAffected()
+	}
+
 	u, err := scanUser(tx.QueryRow(ctx, q, args...))
 	if err != nil {
-		return domain.User{}, pg.Translate(ctx, "update user", err)
+		return domain.User{}, Undone{}, pg.Translate(ctx, "update user", err)
 	}
 
 	// $3 may be NULL (no department); IS NOT DISTINCT FROM treats that as
@@ -234,26 +260,27 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorI
 	WHERE head_id = $1 AND NOT ($2::bool AND id IS NOT DISTINCT FROM $3::bigint)`
 	stillHead := u.Role == domain.RoleManager && u.IsActive
 	if _, err := tx.Exec(ctx, clearHead, u.ID, stillHead, u.DepartmentID); err != nil {
-		return domain.User{}, pg.Translate(ctx, "update user clear head", err)
+		return domain.User{}, Undone{}, pg.Translate(ctx, "update user clear head", err)
 	}
 	if !u.IsActive {
-		if err := revokeLicences(ctx, tx, u.ID, actorID); err != nil {
-			return domain.User{}, pg.Translate(ctx, "update user revoke licences", err)
+		undone.LicencesRevoked, err = revokeLicences(ctx, tx, u.ID, actorID)
+		if err != nil {
+			return domain.User{}, Undone{}, pg.Translate(ctx, "update user revoke licences", err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return domain.User{}, pg.Translate(ctx, "commit update user", err)
+		return domain.User{}, Undone{}, pg.Translate(ctx, "commit update user", err)
 	}
-	return u, nil
+	return u, undone, nil
 }
 
 // revokeLicences revokes every active licence of userID on behalf of actorID
 // and frees the seats. The subscriptions are locked before their assignments,
 // in the order the subscription store uses, so this cannot deadlock with a
 // concurrent cancel or revoke. Nothing to revoke (e.g. an already blocked
-// user being edited) is a no-op.
-func revokeLicences(ctx context.Context, tx pgx.Tx, userID, actorID int64) error {
+// user being edited) is a no-op. It returns how many licences it revoked.
+func revokeLicences(ctx context.Context, tx pgx.Tx, userID, actorID int64) (int64, error) {
 	_, err := tx.Exec(ctx, `
 		SELECT s.id FROM subtrack.subscriptions s
 		JOIN subtrack.subscription_assignments a ON a.subscription_id = s.id
@@ -261,12 +288,12 @@ func revokeLicences(ctx context.Context, tx pgx.Tx, userID, actorID int64) error
 		ORDER BY s.id
 		FOR UPDATE OF s`, userID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// A user holds at most one active licence per subscription (unique index
 	// subscription_assignments_active_key), so each subscription is joined
 	// once and loses exactly one seat.
-	_, err = tx.Exec(ctx, `
+	tag, err := tx.Exec(ctx, `
 		WITH revoked AS (
 		    UPDATE subtrack.subscription_assignments
 		    SET status = 'revoked', revoked_at = NOW(), revoked_by = $2
@@ -274,5 +301,8 @@ func revokeLicences(ctx context.Context, tx pgx.Tx, userID, actorID int64) error
 		    RETURNING subscription_id)
 		UPDATE subtrack.subscriptions s SET seats_used = s.seats_used - 1, updated_at = NOW()
 		FROM revoked r WHERE s.id = r.subscription_id`, userID, actorID)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }

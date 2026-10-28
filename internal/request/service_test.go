@@ -428,6 +428,31 @@ func TestAdminDecidesWhenHeadIsGone(t *testing.T) {
 	}
 }
 
+func TestNoDecisionOnOwnRequest(t *testing.T) {
+	f := newFixture()
+	ctx := context.Background()
+
+	// The employee was made the head while their request waited for the head.
+	r := f.file(t, f.emp)
+	head := f.emp
+	head.Role = domain.RoleManager
+	f.svc.depts = fakeDepts{1: &head.ID}
+	if _, err := f.svc.Decide(ctx, head, r.ID, Verdict{Approve: true}); !errors.Is(err, ErrOwnRequest) || !errors.Is(err, auth.ErrForbidden) {
+		t.Errorf("head on own request: err = %v, want ErrOwnRequest", err)
+	}
+
+	// A manager's request goes to the admin; they were made admin meanwhile.
+	r = f.file(t, f.mgr2)
+	admin := f.mgr2
+	admin.Role = domain.RoleAdmin
+	if _, err := f.svc.Decide(ctx, admin, r.ID, Verdict{Comment: "x"}); !errors.Is(err, ErrOwnRequest) {
+		t.Errorf("admin on own request: err = %v, want ErrOwnRequest", err)
+	}
+	if got, _ := f.repo.GetByID(ctx, r.ID); got.Status != domain.ReqPendingAdmin {
+		t.Errorf("refused decision changed the request: %s", got.Status)
+	}
+}
+
 func TestCancel(t *testing.T) {
 	f := newFixture()
 	ctx := context.Background()

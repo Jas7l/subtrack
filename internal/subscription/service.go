@@ -54,6 +54,7 @@ var (
 // repo is the slice of persistence the service needs; *Store satisfies it.
 type repo interface {
 	GetByID(ctx context.Context, id int64) (domain.Subscription, error)
+	GetForUpdate(ctx context.Context, id int64) (domain.Subscription, error)
 	List(ctx context.Context, f domain.SubscriptionFilter, sc *domain.SubscriptionScope, limit, offset int) ([]domain.Subscription, int64, error)
 	CurrencyExists(ctx context.Context, code string) (bool, error)
 	Create(ctx context.Context, s domain.Subscription) (domain.Subscription, error)
@@ -99,12 +100,22 @@ type Service struct {
 	depts departments
 	tx    transactor
 	audit auditor
+	loc   *time.Location
+	// now is time.Now; tests replace it.
+	now func() time.Time
 }
 
 // New wires a Service over its repo, the users and departments readers, the
-// transaction runner and the audit trail.
-func New(r repo, u users, d departments, tx transactor, a auditor) *Service {
-	return &Service{repo: r, users: u, depts: d, tx: tx, audit: a}
+// transaction runner and the audit trail. loc decides what "today" is (the
+// company's zone, the scheduler's).
+func New(r repo, u users, d departments, tx transactor, a auditor, loc *time.Location) *Service {
+	return &Service{repo: r, users: u, depts: d, tx: tx, audit: a, loc: loc, now: time.Now}
+}
+
+// today is the calendar day in the company's zone, as midnight UTC.
+func (s *Service) today() time.Time {
+	y, m, d := s.now().In(s.loc).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
 // scopeFor returns what actor may see: everything for the admin; their
@@ -237,9 +248,14 @@ func (s *Service) Create(ctx context.Context, actor domain.User, sub domain.Subs
 // Update applies a partial patch on behalf of actor (an admin). People may
 // set the status to active or cancelled only; expiring_soon and expired are
 // the scheduler's. Cancelling revokes every licence in the same transaction.
-// Changing the type without seats_total resets the seats to the new type's
-// default (1 for individual, unlimited for enterprise; group then needs
-// seats_total).
+// Bringing a cancelled or expired subscription back to active moves a past
+// next_payment_date forward to today or later (see reopen). Changing the type without
+// seats_total resets the seats to the new type's default (1 for individual,
+// unlimited for enterprise; group then needs seats_total).
+//
+// The row is read under lock in the same transaction as the write, since
+// every column is written back: a status or payment date the scheduler
+// changes meanwhile is not overwritten with a stale one.
 //
 // Errors:
 //   - apperr.ErrInvalidInput for an empty patch or an invalid value.
@@ -256,35 +272,39 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 	if p.Status != nil && *p.Status != domain.SubActive && *p.Status != domain.SubCancelled {
 		return domain.Subscription{}, fmt.Errorf("%w: status may be set to active or cancelled only", apperr.ErrInvalidInput)
 	}
-	cur, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return domain.Subscription{}, apperr.MapStorage(err, ErrSubscriptionNotFound)
-	}
 
-	sub := apply(cur, p)
-	if err := normalize(&sub); err != nil {
-		return domain.Subscription{}, err
-	}
-	currency := ""
-	if sub.Currency != cur.Currency {
-		currency = sub.Currency
-	}
-	var dept *int64
-	if p.DepartmentID.Set {
-		dept = sub.DepartmentID
-	}
-	if err := s.checkRefs(ctx, currency, dept); err != nil {
-		return domain.Subscription{}, err
-	}
-
-	var out domain.Subscription
-	err = s.tx.InTx(ctx, func(ctx context.Context) error {
+	var cur, out domain.Subscription
+	err := s.tx.InTx(ctx, func(ctx context.Context) error {
 		var err error
+		cur, err = s.repo.GetForUpdate(ctx, id)
+		if err != nil {
+			return err
+		}
+		sub := apply(cur, p)
+		if err := normalize(&sub); err != nil {
+			return err
+		}
+		currency := ""
+		if sub.Currency != cur.Currency {
+			currency = sub.Currency
+		}
+		var dept *int64
+		if p.DepartmentID.Set {
+			dept = sub.DepartmentID
+		}
+		if err := s.checkRefs(ctx, currency, dept); err != nil {
+			return err
+		}
+		moved := reopen(cur, &sub, p, s.today())
+
 		out, err = s.repo.Update(ctx, sub, actor.ID)
 		if err != nil {
 			return err
 		}
 		details := patchDetails(p)
+		if moved {
+			details["next_payment_date"] = dayOrNil(out.NextPaymentDate)
+		}
 		if cur.Status != domain.SubCancelled && out.Status == domain.SubCancelled {
 			details["licences_revoked"] = cur.SeatsUsed
 		}
@@ -373,6 +393,29 @@ func apply(cur domain.Subscription, p domain.SubscriptionPatch) domain.Subscript
 		s.DepartmentID = p.DepartmentID.Value
 	}
 	return s
+}
+
+// reopen moves next_payment_date of a subscription brought back to active
+// from cancelled or expired past the payments it missed meanwhile, so the
+// scheduler does not create a pending payment for each of them: it steps by
+// the billing period to the first date not before today, and clears it when
+// that is past the end date. A date given in the same patch is kept as it
+// is. It reports whether it changed the date.
+func reopen(cur domain.Subscription, sub *domain.Subscription, p domain.SubscriptionPatch, today time.Time) bool {
+	back := (cur.Status == domain.SubCancelled || cur.Status == domain.SubExpired) && sub.Status == domain.SubActive
+	if !back || p.NextPaymentDate.Set || sub.NextPaymentDate == nil || !sub.NextPaymentDate.Before(today) {
+		return false
+	}
+	next := *sub.NextPaymentDate
+	for next.Before(today) {
+		next = sub.BillingPeriod.Next(next)
+	}
+	if sub.EndDate != nil && next.After(*sub.EndDate) {
+		sub.NextPaymentDate = nil
+	} else {
+		sub.NextPaymentDate = &next
+	}
+	return true
 }
 
 // costRe is a non-negative amount that fits NUMERIC(14,2).
@@ -493,12 +536,6 @@ func mapWriteErr(err error) error {
 // the audit trail.
 func patchDetails(p domain.SubscriptionPatch) map[string]any {
 	d := map[string]any{}
-	day := func(t *time.Time) any {
-		if t == nil {
-			return nil
-		}
-		return t.Format(time.DateOnly)
-	}
 	if p.Name != nil {
 		d["name"] = *p.Name
 	}
@@ -521,13 +558,13 @@ func patchDetails(p domain.SubscriptionPatch) map[string]any {
 		d["billing_period"] = string(*p.BillingPeriod)
 	}
 	if p.StartDate != nil {
-		d["start_date"] = day(p.StartDate)
+		d["start_date"] = dayOrNil(p.StartDate)
 	}
 	if p.EndDate.Set {
-		d["end_date"] = day(p.EndDate.Value)
+		d["end_date"] = dayOrNil(p.EndDate.Value)
 	}
 	if p.NextPaymentDate.Set {
-		d["next_payment_date"] = day(p.NextPaymentDate.Value)
+		d["next_payment_date"] = dayOrNil(p.NextPaymentDate.Value)
 	}
 	if p.Status != nil {
 		d["status"] = string(*p.Status)
@@ -539,4 +576,12 @@ func patchDetails(p domain.SubscriptionPatch) map[string]any {
 		d["seats_total"] = *p.SeatsTotal
 	}
 	return d
+}
+
+// dayOrNil formats a date for the audit trail, nil staying nil.
+func dayOrNil(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.Format(time.DateOnly)
 }

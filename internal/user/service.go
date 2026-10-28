@@ -51,7 +51,7 @@ type repo interface {
 	GetByID(ctx context.Context, id int64) (domain.User, error)
 	List(ctx context.Context, f domain.UserFilter, limit, offset int) ([]domain.User, int64, error)
 	Create(ctx context.Context, u domain.User) (domain.User, error)
-	Update(ctx context.Context, id int64, p domain.UserPatch, actorID int64) (domain.User, error)
+	Update(ctx context.Context, id int64, p domain.UserPatch, actorID int64) (domain.User, Undone, error)
 	SetPasswordHash(ctx context.Context, id int64, hash string) error
 }
 
@@ -230,7 +230,8 @@ func (s *Service) Create(ctx context.Context, actor domain.User, in CreateUserIn
 // Side effects, done by the store in the same transaction: if the user headed
 // a department and is no longer an active manager in it (blocked, demoted or
 // moved), that department is left without a head; if the user is blocked,
-// all their licences are revoked by actor.
+// all their licences are revoked by actor and their pending requests are
+// cancelled (the audit record counts both).
 //
 // Errors:
 //   - apperr.ErrInvalidInput for an empty patch or an invalid value.
@@ -274,16 +275,26 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 	}
 
 	var u domain.User
+	var undone Undone
+	blocking := p.IsActive != nil && !*p.IsActive
 	err := s.tx.InTx(ctx, func(ctx context.Context) error {
 		var err error
-		u, err = s.repo.Update(ctx, id, p, actor.ID)
+		u, undone, err = s.repo.Update(ctx, id, p, actor.ID)
 		if err != nil {
 			return err
 		}
-		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "user.update", "user", id, patchDetails(p)))
+		details := patchDetails(p)
+		if blocking {
+			details["licences_revoked"] = undone.LicencesRevoked
+			details["requests_cancelled"] = undone.RequestsCancelled
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "user.update", "user", id, details))
 	})
 	if err != nil {
 		return domain.User{}, mapWriteErr(err)
+	}
+	if blocking {
+		log.Info("user blocked", "id", id, "licences_revoked", undone.LicencesRevoked, "requests_cancelled", undone.RequestsCancelled)
 	}
 	log.Info("user updated", "id", u.ID, "fields", p.Fields())
 	return u, nil

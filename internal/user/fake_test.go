@@ -13,12 +13,14 @@ import (
 
 // fakeRepo is an in-memory users table with the rules the service relies on:
 // unique emails (case-insensitive) and storage.ErrNotFound for a missing row.
-// The side effects of Update (department head, licences) live in SQL and are
-// not modelled.
+// The side effects of Update (department head, licences, requests) live in
+// SQL and are not modelled; Update reports undone as they were.
 type fakeRepo struct {
 	mu     sync.Mutex
 	users  map[int64]domain.User
 	nextID int64
+	// undone is what every Update reports it took back.
+	undone Undone
 }
 
 func newFakeRepo() *fakeRepo {
@@ -78,15 +80,15 @@ func (f *fakeRepo) Create(_ context.Context, u domain.User) (domain.User, error)
 	return u, nil
 }
 
-func (f *fakeRepo) Update(_ context.Context, id int64, p domain.UserPatch, _ int64) (domain.User, error) {
+func (f *fakeRepo) Update(_ context.Context, id int64, p domain.UserPatch, _ int64) (domain.User, Undone, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	u, ok := f.users[id]
 	if !ok {
-		return domain.User{}, storage.ErrNotFound
+		return domain.User{}, Undone{}, storage.ErrNotFound
 	}
 	if p.Email != nil && f.emailTaken(*p.Email, id) {
-		return domain.User{}, &storage.ConstraintError{Constraint: "users_email_key"}
+		return domain.User{}, Undone{}, &storage.ConstraintError{Constraint: "users_email_key"}
 	}
 	if p.FullName != nil {
 		u.FullName = *p.FullName
@@ -104,7 +106,7 @@ func (f *fakeRepo) Update(_ context.Context, id int64, p domain.UserPatch, _ int
 		u.IsActive = *p.IsActive
 	}
 	f.users[id] = u
-	return u, nil
+	return u, f.undone, nil
 }
 
 func (f *fakeRepo) SetPasswordHash(_ context.Context, id int64, hash string) error {

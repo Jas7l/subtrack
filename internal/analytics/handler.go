@@ -142,8 +142,9 @@ type ForecastResponse struct {
 	Unscheduled int    `json:"unscheduled" example:"1"`
 }
 
-// RecommendationDTO is one piece of advice. savings_rub_year is null when
-// it depends on prices the system does not know.
+// RecommendationDTO is one piece of advice. savings_rub_year is the saving
+// over the next year, or until the end date when the subscription ends
+// sooner; null when it depends on prices the system does not know.
 type RecommendationDTO struct {
 	Type            string  `json:"type" example:"unused_seats" enums:"unused_seats,no_holders,duplicate_vendor,individual_to_group,enterprise_low_usage,annual_billing,expired_with_holders"`
 	SubscriptionIDs []int64 `json:"subscription_ids"`
@@ -417,7 +418,7 @@ func (h *handler) forecast(w http.ResponseWriter, r *http.Request) {
 // recommendations godoc
 //
 //	@Summary		Savings recommendations (admin)
-//	@Description	Advice from the rules: unused seats, nobody using a subscription, several subscriptions of one vendor, individual copies of one product, an unlimited licence used by few, monthly billing for over a year, an expired subscription with licences still out. Sorted by yearly saving; advice whose saving cannot be computed comes last with savings_rub_year null.
+//	@Description	Advice from the rules: unused seats, nobody using a subscription, several subscriptions of one vendor, individual copies of one product, an unlimited licence used by few, monthly billing for over a year, an expired subscription with licences still out. Sorted by saving (over the next year, or until the end date of a subscription ending sooner); advice whose saving cannot be computed comes last with savings_rub_year null.
 //	@Tags			analytics
 //	@Produce		json
 //	@Security		BearerAuth

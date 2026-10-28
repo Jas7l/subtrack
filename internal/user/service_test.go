@@ -180,6 +180,7 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("admin edits own name: %v", err)
 	}
 
+	f.repo.undone = Undone{LicencesRevoked: 2, RequestsCancelled: 1}
 	u, err := f.svc.Update(ctx, f.admin, f.emp.ID, domain.UserPatch{
 		IsActive:     &no,
 		DepartmentID: domain.IDPatch{Set: true},
@@ -198,6 +199,18 @@ func TestUpdate(t *testing.T) {
 	}
 	if _, ok := e.Details["full_name"]; ok {
 		t.Error("audit lists a field the patch did not touch")
+	}
+	if e.Details["licences_revoked"] != int64(2) || e.Details["requests_cancelled"] != int64(1) {
+		t.Errorf("blocking does not count what it took back: %+v", e.Details)
+	}
+
+	// Any other edit says nothing about licences and requests.
+	f.repo.undone = Undone{}
+	if _, err := f.svc.Update(ctx, f.admin, f.emp2.ID, domain.UserPatch{FullName: ptr("Emp Two")}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := f.audit.Last().Details["requests_cancelled"]; ok {
+		t.Errorf("rename counts cancelled requests: %+v", f.audit.Last().Details)
 	}
 }
 

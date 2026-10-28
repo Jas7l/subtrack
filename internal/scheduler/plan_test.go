@@ -173,6 +173,32 @@ func TestPlanChargeCap(t *testing.T) {
 	}
 }
 
+func TestPlanChargeCapPutsOffExpiry(t *testing.T) {
+	// 30 monthly payments are owed before the end date: the first run
+	// charges 24 and leaves the subscription open, the second charges the
+	// other 6 and expires it.
+	sub := domain.Subscription{ID: 1, Status: domain.SubActive, BillingPeriod: domain.BillingMonth,
+		NextPaymentDate: dayPtr("2024-01-10"), EndDate: dayPtr("2026-06-30")}
+	today := day("2026-10-23")
+	got := plan(sub, today, domain.NotificationSettings{})
+	if len(got) != 1 || got[0].kind != evCharge || len(got[0].charge) != maxChargesPerRun {
+		t.Fatalf("first run = %+v, want only %d charges", got, maxChargesPerRun)
+	}
+
+	sub.NextPaymentDate = &got[0].next
+	got = plan(sub, today, domain.NotificationSettings{})
+	if len(got) != 2 || len(got[0].charge) != 6 || !got[0].next.Equal(day("2026-07-10")) || got[1].kind != evExpired {
+		t.Fatalf("second run = %+v, want 6 charges, then expired", got)
+	}
+
+	// Exactly the cap owed: nothing is left, so it expires in the same run.
+	sub.NextPaymentDate, sub.EndDate = dayPtr("2024-07-10"), dayPtr("2026-06-30")
+	got = plan(sub, today, domain.NotificationSettings{})
+	if len(got) != 2 || len(got[0].charge) != maxChargesPerRun || got[1].kind != evExpired {
+		t.Fatalf("exactly the cap = %+v, want %d charges, then expired", got, maxChargesPerRun)
+	}
+}
+
 func TestDayIn(t *testing.T) {
 	msk, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {

@@ -75,6 +75,20 @@ func (s *Store) GetByID(ctx context.Context, id int64) (domain.Subscription, err
 	return sub, nil
 }
 
+// GetForUpdate returns one live subscription and locks it until the
+// surrounding transaction ends, so an edit written back whole cannot undo
+// what the scheduler changed meanwhile. Call it inside pg.TxRunner.InTx.
+//
+// Errors: as GetByID.
+func (s *Store) GetForUpdate(ctx context.Context, id int64) (domain.Subscription, error) {
+	sub, err := scanSubscription(pg.Conn(ctx, s.pool).QueryRow(ctx,
+		selectSubscription+` WHERE s.id = $1 AND s.deleted_at IS NULL FOR UPDATE OF s`, id))
+	if err != nil {
+		return domain.Subscription{}, pg.Translate(ctx, "get subscription for update", err)
+	}
+	return sub, nil
+}
+
 // whereBuilder collects SQL conditions and their positional arguments.
 type whereBuilder struct {
 	conds []string
