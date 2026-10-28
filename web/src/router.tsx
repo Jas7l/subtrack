@@ -8,6 +8,7 @@ import { RequireRole } from './auth/RequireRole'
 import { AppLayout } from './layout/AppLayout'
 import { homePath } from './lib/roles'
 import { AssignmentsPage } from './pages/AssignmentsPage'
+import { AuditPage } from './pages/AuditPage'
 import { DepartmentsPage } from './pages/DepartmentsPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyRequestsPage } from './pages/MyRequestsPage'
@@ -19,7 +20,6 @@ import { RecommendationsPage } from './pages/RecommendationsPage'
 import { RequestPage } from './pages/RequestPage'
 import { RequestsPage } from './pages/RequestsPage'
 import { SettingsPage } from './pages/SettingsPage'
-import { StubPage } from './pages/StubPage'
 import { SubscriptionPage } from './pages/SubscriptionPage'
 import { SubscriptionsPage } from './pages/SubscriptionsPage'
 import { TransactionsPage } from './pages/TransactionsPage'
@@ -40,101 +40,32 @@ const STAFF: readonly Role[] = ['manager', 'employee']
 const BOSSES: readonly Role[] = ['admin', 'manager']
 const ADMIN: readonly Role[] = ['admin']
 
-// Pages of the app and who may open them. Until a page is built (no `Page`)
-// it is a stub that names the stage it belongs to (CLIENT_PLAN.md, section 7).
+// Pages of the app and who may open them.
 interface PageDef {
   path: string
   roles: readonly Role[]
-  title: string | Partial<Record<Role, string>>
-  stage: string
-  Page?: ComponentType
+  Page: ComponentType
 }
 
 const pages: PageDef[] = [
-  {
-    path: '/my/subscriptions',
-    roles: STAFF,
-    title: 'Мои подписки',
-    stage: 'К2',
-    Page: MySubscriptionsPage,
-  },
-  { path: '/my/requests', roles: STAFF, title: 'Мои заявки', stage: 'К2', Page: MyRequestsPage },
-  { path: '/requests/:id', roles: ALL, title: 'Заявка', stage: 'К2', Page: RequestPage },
-  {
-    path: '/notifications',
-    roles: ALL,
-    title: 'Уведомления',
-    stage: 'К2',
-    Page: NotificationsPage,
-  },
-  { path: '/profile', roles: ALL, title: 'Профиль', stage: 'К2', Page: ProfilePage },
-  {
-    path: '/dashboard',
-    roles: BOSSES,
-    title: { admin: 'Дашборд', manager: 'Бюджет отдела' },
-    stage: 'К6',
-    Page: DashboardPage,
-  },
-  {
-    path: '/subscriptions',
-    roles: BOSSES,
-    title: { admin: 'Подписки', manager: 'Подписки отдела' },
-    stage: 'К4',
-    Page: SubscriptionsPage,
-  },
-  {
-    path: '/subscriptions/:id',
-    roles: ALL,
-    title: 'Подписка',
-    stage: 'К4',
-    Page: SubscriptionPage,
-  },
-  {
-    path: '/requests',
-    roles: BOSSES,
-    title: { admin: 'Все заявки', manager: 'Заявки отдела' },
-    stage: 'К4',
-    Page: RequestsPage,
-  },
-  {
-    path: '/users',
-    roles: BOSSES,
-    title: { admin: 'Пользователи', manager: 'Сотрудники отдела' },
-    stage: 'К4',
-    Page: UsersPage,
-  },
-  {
-    path: '/users/:id',
-    roles: BOSSES,
-    title: 'Пользователь',
-    stage: 'К4',
-    Page: UserPage,
-  },
-  {
-    path: '/forecast',
-    roles: BOSSES,
-    title: 'Прогноз бюджета',
-    stage: 'К6',
-    Page: ForecastPage,
-  },
-  { path: '/departments', roles: ADMIN, title: 'Отделы', stage: 'К4', Page: DepartmentsPage },
-  { path: '/assignments', roles: ADMIN, title: 'Лицензии', stage: 'К4', Page: AssignmentsPage },
-  {
-    path: '/transactions',
-    roles: ADMIN,
-    title: 'Платежи',
-    stage: 'К5',
-    Page: TransactionsPage,
-  },
-  { path: '/settings', roles: ADMIN, title: 'Настройки', stage: 'К5', Page: SettingsPage },
-  {
-    path: '/recommendations',
-    roles: ADMIN,
-    title: 'Рекомендации',
-    stage: 'К6',
-    Page: RecommendationsPage,
-  },
-  { path: '/audit', roles: ADMIN, title: 'Аудит', stage: 'К7' },
+  { path: '/my/subscriptions', roles: STAFF, Page: MySubscriptionsPage },
+  { path: '/my/requests', roles: STAFF, Page: MyRequestsPage },
+  { path: '/requests/:id', roles: ALL, Page: RequestPage },
+  { path: '/notifications', roles: ALL, Page: NotificationsPage },
+  { path: '/profile', roles: ALL, Page: ProfilePage },
+  { path: '/dashboard', roles: BOSSES, Page: DashboardPage },
+  { path: '/subscriptions', roles: BOSSES, Page: SubscriptionsPage },
+  { path: '/subscriptions/:id', roles: ALL, Page: SubscriptionPage },
+  { path: '/requests', roles: BOSSES, Page: RequestsPage },
+  { path: '/users', roles: BOSSES, Page: UsersPage },
+  { path: '/users/:id', roles: BOSSES, Page: UserPage },
+  { path: '/forecast', roles: BOSSES, Page: ForecastPage },
+  { path: '/departments', roles: ADMIN, Page: DepartmentsPage },
+  { path: '/assignments', roles: ADMIN, Page: AssignmentsPage },
+  { path: '/transactions', roles: ADMIN, Page: TransactionsPage },
+  { path: '/settings', roles: ADMIN, Page: SettingsPage },
+  { path: '/recommendations', roles: ADMIN, Page: RecommendationsPage },
+  { path: '/audit', roles: ADMIN, Page: AuditPage },
 ]
 
 const pageSpin = (
@@ -143,19 +74,13 @@ const pageSpin = (
   </div>
 )
 
-// RolePage renders the page, or a stub until it is built.
-function RolePage({ page }: { page: PageDef }) {
-  const me = useMe()
-  const { Page } = page
-  if (Page) {
-    return (
-      <Suspense fallback={pageSpin}>
-        <Page />
-      </Suspense>
-    )
-  }
-  const title = typeof page.title === 'string' ? page.title : (page.title[me.role] ?? '')
-  return <StubPage title={title} stage={page.stage} />
+// LazyPage gives the pages loaded on demand a spinner meanwhile.
+function LazyPage({ Page }: { Page: ComponentType }) {
+  return (
+    <Suspense fallback={pageSpin}>
+      <Page />
+    </Suspense>
+  )
 }
 
 function HomeRedirect() {
@@ -188,7 +113,7 @@ export const router = createBrowserRouter([
             path: page.path,
             element: (
               <RequireRole roles={page.roles}>
-                <RolePage page={page} />
+                <LazyPage Page={page.Page} />
               </RequireRole>
             ),
           })),

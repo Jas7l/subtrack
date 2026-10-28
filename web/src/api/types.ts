@@ -453,3 +453,28 @@ export interface RecommendationsResponse {
   items: RecommendationDTO[]
   total_savings_rub_year: string
 }
+
+export type AuditEntityType =
+  | 'user'
+  | 'department'
+  | 'subscription'
+  | 'assignment'
+  | 'request'
+  | 'transaction'
+  | 'settings'
+  | 'currency'
+
+// One record of GET /audit. actor_id null — the system (the scheduler).
+// action is "<entity>.<verb>", e.g. subscription.update; details hold what
+// changed (only the changed fields for an update).
+export interface AuditEntryDTO {
+  id: number
+  actor_id: number | null
+  actor_name: string | null
+  action: string
+  entity_type: AuditEntityType
+  // null for settings and currencies (the code is in details).
+  entity_id: number | null
+  details: Record<string, unknown>
+  created_at: string
+}

@@ -809,6 +809,67 @@ body {
   gap: 16px;
 }
 
+/* Audit: the details of a record and the history on a card. */
+.audit-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 24px;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.audit-detail {
+  display: contents;
+}
+
+.audit-detail dt {
+  color: #949ba4;
+}
+
+.audit-detail dd {
+  margin: 0;
+  color: #dbdee1;
+}
+
+.system-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #383a40;
+  color: #b5bac1;
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-item {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid #3f4147;
+}
+
+.history-item:last-child {
+  border-bottom: 0;
+}
+
+.history-body {
+  min-width: 0;
+}
+
+.history-summary {
+  color: #949ba4;
+}
+
 /* PDF (window.print): the page as on screen, dark, without the menu and
    buttons. The page margins are zero so no white frame is left around the
    dark background; the padding of the main area takes their place. */

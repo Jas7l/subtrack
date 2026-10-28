@@ -17,6 +17,7 @@ import {
 import { useTransactions } from '../api/transactions'
 import type { AssignmentDTO, SubscriptionDTO } from '../api/types'
 import { useMe } from '../auth/AuthContext'
+import { AuditHistory } from '../components/AuditHistory'
 import { GrantLicenceModal } from '../components/GrantLicenceModal'
 import { PageHeader } from '../components/PageHeader'
 import { QueryState } from '../components/QueryState'
@@ -37,8 +38,7 @@ import { costText, isOpen, seatsText } from '../lib/subscriptions'
 // only to whoever manages the subscription (the admin, a manager of the
 // owning department): for anyone else the server returns just their own
 // licence. The admin also edits, cancels and deletes it and sees its
-// payments with «Добавить платёж»; the change history from the audit (К7)
-// goes under them.
+// payments with «Добавить платёж» and its change history from the audit.
 export function SubscriptionPage() {
   const id = Number(useParams().id)
   const me = useMe()
@@ -97,7 +97,12 @@ export function SubscriptionPage() {
         </Card>
         {manages ? <Holders subscription={s} /> : <MyLicence subscription={s} />}
       </div>
-      {me.role === 'admin' && <Payments subscription={s} />}
+      {me.role === 'admin' && (
+        <>
+          <Payments subscription={s} />
+          <AuditHistory entityType="subscription" entityId={s.id} />
+        </>
+      )}
     </>
   )
 }

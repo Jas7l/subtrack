@@ -61,7 +61,7 @@ const ALL = { limit: 200 }
 // department, read-only, and only the licences of the department's
 // subscriptions. The admin also edits, blocks and resets the password (the
 // same UserActions as in the table), hands out and revokes licences, sees
-// the person's requests and opens their actions in the audit (К7).
+// the person's requests and opens their actions in the audit.
 export function UserPage() {
   const id = Number(useParams().id)
   const me = useMe()
