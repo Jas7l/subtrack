@@ -7,6 +7,7 @@ import { Logo } from '../components/Logo'
 import { NotificationBell } from '../components/NotificationBell'
 import { UserAvatar } from '../components/UserAvatar'
 import { roleLabels } from '../lib/labels'
+import { inboxStatus } from '../lib/permissions'
 import { homePath, isGroup, navByRole, type NavLeaf } from '../lib/roles'
 
 // selectedKey picks the menu item for the current page: the longest item path
@@ -24,11 +25,7 @@ export function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  // Requests waiting for this user: a department head decides pending_manager,
-  // an admin pending_admin; anyone else has nothing to decide.
-  const pendingStatus =
-    me.role === 'admin' ? 'pending_admin' : me.role === 'manager' && isHead ? 'pending_manager' : null
-  const pending = usePendingRequestsCount(pendingStatus)
+  const pending = usePendingRequestsCount(inboxStatus(me, isHead))
 
   const nav = navByRole[me.role]
   const leaves = nav.flatMap((item) => (isGroup(item) ? item.children : [item]))

@@ -5,20 +5,21 @@ import {
   LinkOutlined,
   StopFilled,
 } from '@ant-design/icons'
-import { Alert, Card, Descriptions, Result, Spin, Steps, Timeline, type StepsProps } from 'antd'
+import { Card, Descriptions, Steps, Timeline, type StepsProps } from 'antd'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
-import { ApiError } from '../api/client'
 import { useRequest } from '../api/requests'
 import type { RequestDTO } from '../api/types'
-import { useMe } from '../auth/AuthContext'
+import { useAuth, useMe } from '../auth/AuthContext'
 import { CancelRequestButton } from '../components/CancelRequestButton'
+import { DecisionButtons } from '../components/DecisionButtons'
 import { PageHeader } from '../components/PageHeader'
 import { ServiceTile } from '../components/ServiceTile'
+import { QueryState } from '../components/QueryState'
 import { RequestStatusBadge } from '../components/StatusBadge'
-import { errorText } from '../lib/errors'
 import { formatDay, formatMoment, formatMoney } from '../lib/format'
 import { isPending } from '../lib/labels'
+import { canDecide } from '../lib/permissions'
 import { colors } from '../theme'
 
 type StepItem = NonNullable<StepsProps['items']>[number]
@@ -148,27 +149,11 @@ function requestHistory(r: RequestDTO): Event[] {
 export function RequestPage() {
   const id = Number(useParams().id)
   const me = useMe()
+  const { isHead } = useAuth()
   const query = useRequest(id)
 
-  if (query.isPending) {
-    return (
-      <div className="page-spin">
-        <Spin size="large" />
-      </div>
-    )
-  }
-  if (query.error) {
-    if (query.error instanceof ApiError && query.error.status === 404) {
-      return (
-        <Result
-          status="404"
-          title="Заявка не найдена"
-          subTitle="Её нет или она вам не видна."
-          extra={<Link to="/">На главную</Link>}
-        />
-      )
-    }
-    return <Alert type="error" showIcon title={errorText(query.error)} />
+  if (!query.data) {
+    return <QueryState error={query.error} missing={!Number.isInteger(id)} notFound="Заявка не найдена" />
   }
 
   const r = query.data
@@ -178,10 +163,12 @@ export function RequestPage() {
     steps.findIndex((s) => s.status === 'process' || s.status === 'error'),
   )
 
-  // On К2 only the requester's «Отменить»; the decisions of the head and the
-  // admin are added on К3/К4.
-  const actions = me.id === r.requester_id && isPending(r.status) && (
-    <CancelRequestButton request={r} />
+  // Buttons by role and status (CLIENT_PLAN.md, section 6); the admin's
+  // decisions are К4.
+  const actions = canDecide(me, isHead, r) ? (
+    <DecisionButtons request={r} />
+  ) : (
+    me.id === r.requester_id && isPending(r.status) && <CancelRequestButton request={r} />
   )
 
   return (

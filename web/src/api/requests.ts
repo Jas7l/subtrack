@@ -6,7 +6,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query'
 import { request, type Query } from './client'
-import type { CreateRequestBody, Page, RequestDTO } from './types'
+import type { ApproveBody, CreateRequestBody, Page, RequestDTO } from './types'
 
 // usePendingRequestsCount backs the badge on «Заявки»: how many requests wait
 // for the caller's decision (`pending_manager` for a head, `pending_admin` for
@@ -33,6 +33,8 @@ export function useRequest(id: number) {
   return useQuery({
     queryKey: ['requests', 'one', id],
     queryFn: () => request<RequestDTO>(`/requests/${id}`),
+    // A non-numeric id in the address is a 400 on the server: not asked.
+    enabled: Number.isInteger(id),
   })
 }
 
@@ -57,5 +59,26 @@ export function useCancelRequest() {
   return useMutation({
     mutationFn: (id: number) => request<RequestDTO>(`/requests/${id}/cancel`, { method: 'POST' }),
     onSuccess: () => afterChange(queryClient),
+  })
+}
+
+// A decision refreshes the request even when it fails: a 409 «already
+// decided» means the card is stale and its buttons must go.
+export function useApproveRequest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    // The server rejects an empty body, so there is always an object.
+    mutationFn: ({ id, body }: { id: number; body: ApproveBody }) =>
+      request<RequestDTO>(`/requests/${id}/approve`, { method: 'POST', body }),
+    onSettled: () => afterChange(queryClient),
+  })
+}
+
+export function useRejectRequest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, comment }: { id: number; comment: string }) =>
+      request<RequestDTO>(`/requests/${id}/reject`, { method: 'POST', body: { comment } }),
+    onSettled: () => afterChange(queryClient),
   })
 }

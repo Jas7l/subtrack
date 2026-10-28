@@ -175,3 +175,73 @@ export interface CurrencyDTO {
   updated_at: string
   updated_by: number | null
 }
+
+export interface ApproveBody {
+  comment?: string
+  // The admin's choice (К4): an existing subscription or a new one.
+  subscription_id?: number
+  subscription?: Record<string, unknown>
+}
+
+export interface CreateAssignmentBody {
+  subscription_id: number
+  user_id: number
+}
+
+// Analytics: sums are in roubles at the current rates, as strings.
+export interface PaymentStatsDTO {
+  paid_this_month_rub: string
+  paid_this_year_rub: string
+  pending_count: number
+  pending_rub: string
+  overdue_count: number
+  failed_count: number
+}
+
+export interface SummaryDTO {
+  department_id: number | null
+  active_subscriptions: number
+  expiring_soon: number
+  expired: number
+  monthly_cost_rub: string
+  annual_cost_rub: string
+  seats_total: number
+  seats_used: number
+  seats_free: number
+  // null when there are no counted seats.
+  utilization_pct: number | null
+  enterprise_subscriptions: number
+  licences: number
+  active_users: number
+  cost_per_user_rub: string | null
+  // The admin only.
+  payments?: PaymentStatsDTO
+  recommendations?: number
+  potential_savings_rub?: string
+}
+
+// One row of a breakdown by category or vendor; key "" — without one.
+export interface SliceDTO {
+  key: string
+  subscriptions: number
+  monthly_cost_rub: string
+  share_pct: number
+}
+
+export interface ForecastMonthDTO {
+  // "YYYY-MM"
+  month: string
+  scheduled_rub: string
+  payments: number
+  // The monthly cost of subscriptions without a next payment date.
+  estimated_rub: string
+  total_rub: string
+}
+
+export interface ForecastResponse {
+  months: ForecastMonthDTO[]
+  total_rub: string
+  run_rate_rub: string
+  // Active subscriptions without a next payment date.
+  unscheduled: number
+}

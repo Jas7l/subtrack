@@ -11,3 +11,11 @@ export function useSubscriptions(query: Query = {}) {
     placeholderData: keepPreviousData,
   })
 }
+
+export function useSubscription(id: number) {
+  return useQuery({
+    queryKey: ['subscriptions', 'one', id],
+    queryFn: () => request<SubscriptionDTO>(`/subscriptions/${id}`),
+    enabled: Number.isInteger(id),
+  })
+}

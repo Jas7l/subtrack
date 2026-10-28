@@ -38,3 +38,11 @@ const requestTones: Record<RequestStatus, Tone> = {
 export function RequestStatusBadge({ status }: { status: RequestStatus }) {
   return <StatusBadge tone={requestTones[status]}>{requestStatusLabels[status]}</StatusBadge>
 }
+
+export function UserStatusBadge({ active }: { active: boolean }) {
+  return active ? (
+    <StatusBadge tone="success">Активен</StatusBadge>
+  ) : (
+    <StatusBadge tone="muted">Заблокирован</StatusBadge>
+  )
+}

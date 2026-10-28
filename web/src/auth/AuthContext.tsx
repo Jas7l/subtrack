@@ -11,6 +11,8 @@ interface AuthState {
   department: DepartmentDTO | undefined
   // A manager is a head only of the department whose head_id is theirs.
   isHead: boolean
+  // isHead is false until the department loads; pages that depend on it wait.
+  departmentLoading: boolean
   loading: boolean
   error: unknown
   login: (email: string, password: string) => Promise<MeDTO>
@@ -65,12 +67,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       me,
       department,
       isHead: me !== undefined && department?.head_id === me.id,
+      departmentLoading: departmentId !== null && departmentQuery.isPending,
       loading: token !== null && meQuery.isPending,
       error: meQuery.error,
       login,
       logout,
     }),
-    [token, me, department, meQuery.isPending, meQuery.error, login, logout],
+    [
+      token,
+      me,
+      department,
+      departmentId,
+      departmentQuery.isPending,
+      meQuery.isPending,
+      meQuery.error,
+      login,
+      logout,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

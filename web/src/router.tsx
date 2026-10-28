@@ -1,4 +1,5 @@
-import type { ComponentType } from 'react'
+import { Spin } from 'antd'
+import { lazy, Suspense, type ComponentType } from 'react'
 import { Navigate, Outlet, createBrowserRouter } from 'react-router'
 import type { Role } from './api/types'
 import { AuthProvider, useMe } from './auth/AuthContext'
@@ -13,7 +14,21 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RequestPage } from './pages/RequestPage'
+import { RequestsPage } from './pages/RequestsPage'
 import { StubPage } from './pages/StubPage'
+import { SubscriptionPage } from './pages/SubscriptionPage'
+import { SubscriptionsPage } from './pages/SubscriptionsPage'
+import { UserPage } from './pages/UserPage'
+import { UsersPage } from './pages/UsersPage'
+
+// Pages with charts are loaded on demand: recharts stays out of the main
+// bundle.
+const DashboardPage = lazy(() =>
+  import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+)
+const ForecastPage = lazy(() =>
+  import('./pages/ForecastPage').then((m) => ({ default: m.ForecastPage })),
+)
 
 const ALL: readonly Role[] = ['admin', 'manager', 'employee']
 const STAFF: readonly Role[] = ['manager', 'employee']
@@ -22,13 +37,18 @@ const ADMIN: readonly Role[] = ['admin']
 
 // Pages of the app and who may open them. Until a page is built (no `Page`)
 // it is a stub that names the stage it belongs to (CLIENT_PLAN.md, section 7).
+// `builtFor` limits a built page to some roles: the others still see the
+// stub (the admin's versions come later).
 interface PageDef {
   path: string
   roles: readonly Role[]
   title: string | Partial<Record<Role, string>>
   stage: string
   Page?: ComponentType
+  builtFor?: readonly Role[]
 }
+
+const MANAGER: readonly Role[] = ['manager']
 
 const pages: PageDef[] = [
   {
@@ -52,29 +72,58 @@ const pages: PageDef[] = [
     path: '/dashboard',
     roles: BOSSES,
     title: { admin: 'Дашборд', manager: 'Бюджет отдела' },
-    stage: 'К3',
+    stage: 'К6',
+    Page: DashboardPage,
+    builtFor: MANAGER,
   },
   {
     path: '/subscriptions',
     roles: BOSSES,
     title: { admin: 'Подписки', manager: 'Подписки отдела' },
-    stage: 'К3',
+    stage: 'К4',
+    Page: SubscriptionsPage,
+    builtFor: MANAGER,
   },
-  { path: '/subscriptions/:id', roles: ALL, title: 'Подписка', stage: 'К3' },
+  {
+    path: '/subscriptions/:id',
+    roles: ALL,
+    title: 'Подписка',
+    stage: 'К4',
+    Page: SubscriptionPage,
+    builtFor: STAFF,
+  },
   {
     path: '/requests',
     roles: BOSSES,
     title: { admin: 'Все заявки', manager: 'Заявки отдела' },
-    stage: 'К3',
+    stage: 'К4',
+    Page: RequestsPage,
+    builtFor: MANAGER,
   },
   {
     path: '/users',
     roles: BOSSES,
     title: { admin: 'Пользователи', manager: 'Сотрудники отдела' },
-    stage: 'К3',
+    stage: 'К4',
+    Page: UsersPage,
+    builtFor: MANAGER,
   },
-  { path: '/users/:id', roles: BOSSES, title: 'Пользователь', stage: 'К3' },
-  { path: '/forecast', roles: BOSSES, title: 'Прогноз бюджета', stage: 'К3' },
+  {
+    path: '/users/:id',
+    roles: BOSSES,
+    title: 'Пользователь',
+    stage: 'К4',
+    Page: UserPage,
+    builtFor: MANAGER,
+  },
+  {
+    path: '/forecast',
+    roles: BOSSES,
+    title: 'Прогноз бюджета',
+    stage: 'К6',
+    Page: ForecastPage,
+    builtFor: MANAGER,
+  },
   { path: '/departments', roles: ADMIN, title: 'Отделы', stage: 'К4' },
   { path: '/assignments', roles: ADMIN, title: 'Лицензии', stage: 'К4' },
   { path: '/transactions', roles: ADMIN, title: 'Платежи', stage: 'К5' },
@@ -83,8 +132,23 @@ const pages: PageDef[] = [
   { path: '/audit', roles: ADMIN, title: 'Аудит', stage: 'К7' },
 ]
 
-function Stub({ page }: { page: PageDef }) {
+const pageSpin = (
+  <div className="page-spin">
+    <Spin size="large" />
+  </div>
+)
+
+// RolePage renders the page built for the user's role, or a stub.
+function RolePage({ page }: { page: PageDef }) {
   const me = useMe()
+  const { Page } = page
+  if (Page && (!page.builtFor || page.builtFor.includes(me.role))) {
+    return (
+      <Suspense fallback={pageSpin}>
+        <Page />
+      </Suspense>
+    )
+  }
   const title = typeof page.title === 'string' ? page.title : (page.title[me.role] ?? '')
   return <StubPage title={title} stage={page.stage} />
 }
@@ -119,7 +183,7 @@ export const router = createBrowserRouter([
             path: page.path,
             element: (
               <RequireRole roles={page.roles}>
-                {page.Page ? <page.Page /> : <Stub page={page} />}
+                <RolePage page={page} />
               </RequireRole>
             ),
           })),

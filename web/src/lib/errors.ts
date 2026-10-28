@@ -39,6 +39,12 @@ const known: Record<string, string> = {
   'the currency is used by subscriptions, requests or payments and cannot be deleted':
     'Валюта используется в подписках, заявках или платежах — удалить нельзя',
   'bad period': 'Неверный период',
+  'insufficient permissions: only the head of the department reviews its requests':
+    'Решать по заявкам отдела может только его начальник',
+  'insufficient permissions: you are in no department': 'Вы не привязаны к отделу',
+  'subscription_id and user_id are required': 'Выберите сотрудника',
+  'assignment not found': 'Лицензия не найдена',
+  'user not found': 'Пользователь не найден',
   'request not found': 'Заявка не найдена',
   'subscription not found': 'Подписка не найдена',
 }
