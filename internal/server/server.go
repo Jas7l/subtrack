@@ -81,7 +81,7 @@ func routes(r *mux.Router, pool *pgxpool.Pool, authCfg auth.Config, loc *time.Lo
 	subscription.RegisterRoutes(protected, subs)
 	request.RegisterRoutes(protected, request.New(request.NewStore(pool), depts, subs, tx, trail, inbox))
 	notification.RegisterRoutes(protected, notification.New(inbox))
-	audit.RegisterRoutes(protected, audit.New(trail))
+	audit.RegisterRoutes(protected, audit.New(trail, loc))
 	settings.RegisterRoutes(protected, settings.New(settings.NewStore(pool), tx, trail))
 	currency.RegisterRoutes(protected, currency.New(currency.NewStore(pool), tx, trail))
 	transaction.RegisterRoutes(protected, transaction.New(transaction.NewStore(pool), subStore, tx, trail, loc))

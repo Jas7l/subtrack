@@ -78,11 +78,13 @@ export function useCreateRequest() {
   })
 }
 
+// Like a decision, a cancel refreshes even when it fails: the request may
+// have been decided meanwhile.
 export function useCancelRequest() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => request<RequestDTO>(`/requests/${id}/cancel`, { method: 'POST' }),
-    onSuccess: () => afterChange(queryClient),
+    onSettled: () => afterChange(queryClient),
   })
 }
 

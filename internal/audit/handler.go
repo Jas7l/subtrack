@@ -58,7 +58,7 @@ type ListAuditResponse struct {
 //	@Failure		500			{object}	httpx.ErrorBody
 //	@Router			/audit [get]
 func (h *handler) list(w http.ResponseWriter, r *http.Request) {
-	f, err := parseFilter(r)
+	f, err := parseFilter(r, h.svc.loc)
 	if err != nil {
 		writeErr(r.Context(), w, err)
 		return
@@ -86,8 +86,10 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 // entityTypes are the entity_type values the trail is written with.
 var entityTypes = []string{"user", "department", "subscription", "assignment", "request", "transaction", "settings", "currency"}
 
-// parseFilter reads the list filters. A malformed filter is a 400.
-func parseFilter(r *http.Request) (domain.AuditFilter, error) {
+// parseFilter reads the list filters. A malformed filter is a 400. The from
+// and to days are the company's days (loc), not UTC ones: an entry made at
+// 01:00 in Moscow belongs to that day.
+func parseFilter(r *http.Request, loc *time.Location) (domain.AuditFilter, error) {
 	q := r.URL.Query()
 	f := domain.AuditFilter{EntityType: q.Get("entity_type"), Action: q.Get("action")}
 	if f.EntityType != "" && !slices.Contains(entityTypes, f.EntityType) {
@@ -114,10 +116,21 @@ func parseFilter(r *http.Request) (domain.AuditFilter, error) {
 	if f.To, err = httpx.QueryDate(q, "to"); err != nil {
 		return f, err
 	}
+	if f.From != nil {
+		start := midnightIn(*f.From, loc)
+		f.From = &start
+	}
 	if f.To != nil {
 		// "to" names a whole day; the store's bound is exclusive.
-		next := f.To.AddDate(0, 0, 1)
+		next := midnightIn(f.To.AddDate(0, 0, 1), loc)
 		f.To = &next
 	}
 	return f, nil
+}
+
+// midnightIn returns the moment day (a calendar day, midnight UTC) begins
+// in loc.
+func midnightIn(day time.Time, loc *time.Location) time.Time {
+	y, m, d := day.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, loc)
 }

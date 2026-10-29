@@ -10,6 +10,7 @@ package audit
 import (
 	"context"
 	"strings"
+	"time"
 
 	"subtrack/internal/domain"
 	"subtrack/internal/logger"
@@ -24,11 +25,14 @@ type repo interface {
 // Service serves the audit trail.
 type Service struct {
 	repo repo
+	// loc is the company's time zone (SCHEDULER_TZ): the days of the from/to
+	// filters begin at its midnight.
+	loc *time.Location
 }
 
-// New wires a Service over the audit repo.
-func New(r repo) *Service {
-	return &Service{repo: r}
+// New wires a Service over the audit repo. loc is the company's time zone.
+func New(r repo, loc *time.Location) *Service {
+	return &Service{repo: r, loc: loc}
 }
 
 // List returns one page of entries matching f, newest first. Access is
