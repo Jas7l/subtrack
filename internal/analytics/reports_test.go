@@ -212,3 +212,55 @@ func TestForecast(t *testing.T) {
 		t.Errorf("run rate = %s", f.RunRateRUB)
 	}
 }
+
+// TestForecastAcrossYear: 15 months from November 2026 to January 2028, with
+// payment days clamped at month ends.
+func TestForecastAcrossYear(t *testing.T) {
+	today := day("2026-11-30")
+	subs := []sub{
+		// Yearly: the next payment is in November 2027, month 12.
+		mk(1, "1200", func(s *sub) { s.Period = domain.BillingYear; s.NextPaymentDate = dayPtr("2027-11-30") }),
+		// Monthly on the 31st until mid-March: 31.12, 31.01, 28.02.
+		mk(2, "100", func(s *sub) { s.NextPaymentDate = dayPtr("2026-12-31"); s.EndDate = dayPtr("2027-03-15") }),
+		// Quarterly from today: 30.11, then the 28th of Feb, May, Aug, Nov;
+		// 28.02.2028 is past the horizon.
+		mk(3, "300", func(s *sub) { s.Period = domain.BillingQuarter; s.NextPaymentDate = dayPtr("2026-11-30") }),
+		// No schedule: 1200 a year → 100 a month, until it ends in January.
+		mk(4, "1200", func(s *sub) { s.Period = domain.BillingYear; s.EndDate = dayPtr("2027-01-15") }),
+	}
+	type m struct {
+		sched string
+		n     int
+		est   string
+	}
+	want := map[string]m{
+		"2026-11": {"300.00", 1, "100.00"},
+		"2026-12": {"100.00", 1, "100.00"},
+		"2027-01": {"100.00", 1, "100.00"},
+		"2027-02": {"400.00", 2, "0.00"},
+		"2027-05": {"300.00", 1, "0.00"},
+		"2027-08": {"300.00", 1, "0.00"},
+		"2027-11": {"1500.00", 2, "0.00"},
+	}
+	f := forecast(subs, today, 15)
+	if len(f.Months) != 15 || f.Months[14].Month.Format("2006-01") != "2028-01" {
+		t.Fatalf("months = %+v", f.Months)
+	}
+	for _, got := range f.Months {
+		key := got.Month.Format("2006-01")
+		w, ok := want[key]
+		if !ok {
+			w = m{"0.00", 0, "0.00"}
+		}
+		if got.ScheduledRUB != w.sched || got.Payments != w.n || got.EstimatedRUB != w.est {
+			t.Errorf("%s = %+v, want %+v", key, got, w)
+		}
+	}
+	if f.TotalRUB != "3300.00" {
+		t.Errorf("total = %s, want 3300.00", f.TotalRUB)
+	}
+	// Every subscription costs 100 a month: 400 × 15.
+	if f.RunRateRUB != "6000.00" {
+		t.Errorf("run rate = %s, want 6000.00", f.RunRateRUB)
+	}
+}

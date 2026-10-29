@@ -113,10 +113,40 @@ func TestMonthsBetween(t *testing.T) {
 	cases := []struct {
 		a, b string
 		want int
-	}{{"2025-10-23", "2026-10-23", 12}, {"2025-10-24", "2026-10-23", 11}, {"2026-10-01", "2026-10-31", 0}}
+	}{
+		{"2025-10-23", "2026-10-23", 12}, {"2025-10-24", "2026-10-23", 11}, {"2026-10-01", "2026-10-31", 0},
+		{"2026-12-31", "2027-01-31", 1}, {"2026-12-15", "2027-01-14", 0}, {"2025-12-31", "2027-01-01", 12},
+		{"2026-01-31", "2026-02-28", 0}, {"2026-10-23", "2026-09-30", -1},
+	}
 	for _, c := range cases {
 		if got := monthsBetween(day(c.a), day(c.b)); got != c.want {
 			t.Errorf("monthsBetween(%s, %s) = %d, want %d", c.a, c.b, got, c.want)
+		}
+	}
+}
+
+// TestCostAhead: months to the end date, a begun one counted whole, at month
+// ends and over New Year. The subscription costs 1200 a year.
+func TestCostAhead(t *testing.T) {
+	cases := []struct {
+		now, end   string
+		cost, span string
+	}{
+		{"2026-12-31", "2027-01-31", "100.00", " до окончания"},
+		{"2026-12-31", "2027-02-01", "200.00", " до окончания"},
+		// 31.01 → 28.02 is a month, the way BillingPeriod.Next steps.
+		{"2026-01-31", "2026-02-28", "100.00", " до окончания"},
+		{"2026-12-16", "2027-12-15", "1200.00", "/год"},
+		{"2026-12-15", "2027-12-14", "1200.00", "/год"},
+		{"2026-12-15", "2027-11-14", "1100.00", " до окончания"},
+		{"2026-10-23", "2026-10-23", "0.00", " до окончания"},
+		{"2026-10-23", "2026-10-01", "0.00", " до окончания"},
+	}
+	for _, c := range cases {
+		s := mk(1, "100", func(s *sub) { s.EndDate = dayPtr(c.end) })
+		cost, span := s.costAhead(day(c.now))
+		if money(cost) != c.cost || span != c.span {
+			t.Errorf("%s → %s: %s%q, want %s%q", c.now, c.end, money(cost), span, c.cost, c.span)
 		}
 	}
 }

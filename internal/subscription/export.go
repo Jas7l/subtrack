@@ -2,7 +2,6 @@ package subscription
 
 import (
 	"net/http"
-	"time"
 
 	"subtrack/internal/auth"
 	"subtrack/internal/domain"
@@ -66,5 +65,5 @@ func (h *handler) export(w http.ResponseWriter, r *http.Request) {
 			xlsx.DayPtr(s.EndDate), xlsx.DayPtr(s.NextPaymentDate), statusLabel[s.Status], dept,
 			s.SeatsTotal, s.SeatsUsed, s.CreatedAt})
 	}
-	xlsx.Respond(r.Context(), w, xlsx.Filename("subscriptions", time.Now(), time.Local), sheet)
+	xlsx.Respond(r.Context(), w, xlsx.Filename("subscriptions", h.svc.now(), h.svc.loc), h.svc.loc, sheet)
 }

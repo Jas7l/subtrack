@@ -84,7 +84,7 @@ func routes(r *mux.Router, pool *pgxpool.Pool, authCfg auth.Config, loc *time.Lo
 	audit.RegisterRoutes(protected, audit.New(trail))
 	settings.RegisterRoutes(protected, settings.New(settings.NewStore(pool), tx, trail))
 	currency.RegisterRoutes(protected, currency.New(currency.NewStore(pool), tx, trail))
-	transaction.RegisterRoutes(protected, transaction.New(transaction.NewStore(pool), subStore, tx, trail))
+	transaction.RegisterRoutes(protected, transaction.New(transaction.NewStore(pool), subStore, tx, trail, loc))
 	analytics.RegisterRoutes(protected, analytics.New(analytics.NewStore(pool), loc))
 	return authSvc
 }

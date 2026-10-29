@@ -86,11 +86,14 @@ type Service struct {
 	subs  subscriptions
 	tx    transactor
 	audit auditor
+	// loc is the company's time zone (SCHEDULER_TZ): the export shows its
+	// times in it.
+	loc *time.Location
 }
 
 // New wires a Service.
-func New(r repo, subs subscriptions, tx transactor, a auditor) *Service {
-	return &Service{repo: r, subs: subs, tx: tx, audit: a}
+func New(r repo, subs subscriptions, tx transactor, a auditor, loc *time.Location) *Service {
+	return &Service{repo: r, subs: subs, tx: tx, audit: a, loc: loc}
 }
 
 // Get returns one payment.

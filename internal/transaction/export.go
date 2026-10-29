@@ -52,5 +52,5 @@ func (h *handler) export(w http.ResponseWriter, r *http.Request) {
 		sheet.Rows = append(sheet.Rows, []any{t.ID, t.SubscriptionName, t.SubscriptionID, xlsx.Day(t.PaymentDate),
 			xlsx.Money(t.Amount), t.Currency, statusLabel[t.Status], t.PaymentMethod, t.InvoiceNumber, t.PaidAt, t.CreatedAt})
 	}
-	xlsx.Respond(r.Context(), w, xlsx.Filename("payments", time.Now(), time.Local), sheet)
+	xlsx.Respond(r.Context(), w, xlsx.Filename("payments", time.Now(), h.svc.loc), h.svc.loc, sheet)
 }

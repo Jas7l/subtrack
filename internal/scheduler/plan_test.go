@@ -199,6 +199,60 @@ func TestPlanChargeCapPutsOffExpiry(t *testing.T) {
 	}
 }
 
+func TestPlanYearEnd(t *testing.T) {
+	st := domain.NotificationSettings{ExpiringDays: 7, PaymentDays: 3}
+	cases := []struct {
+		name  string
+		today string
+		sub   domain.Subscription
+		want  []event
+	}{
+		{
+			name:  "charged on 31.12, next on 31.01",
+			today: "2026-12-31",
+			sub: domain.Subscription{ID: 1, Status: domain.SubActive, BillingPeriod: domain.BillingMonth,
+				NextPaymentDate: dayPtr("2026-12-31")},
+			want: []event{
+				{kind: evCharge, charge: []time.Time{day("2026-12-31")}, next: day("2027-01-31")},
+				{kind: evPayment, key: "sub_1_payment_2026-12-31", next: day("2026-12-31")},
+			},
+		},
+		{
+			name:  "windows reach into January",
+			today: "2026-12-30",
+			sub: domain.Subscription{ID: 2, Status: domain.SubActive, BillingPeriod: domain.BillingYear,
+				NextPaymentDate: dayPtr("2027-01-02"), EndDate: dayPtr("2027-01-06")},
+			want: []event{
+				{kind: evExpiring, status: domain.SubExpiringSoon, key: "sub_2_expiring_2027-01-06"},
+				{kind: evPayment, key: "sub_2_payment_2027-01-02", next: day("2027-01-02")},
+			},
+		},
+		{
+			name:  "missed run over New Year catches up",
+			today: "2027-01-01",
+			sub: domain.Subscription{ID: 3, Status: domain.SubActive, BillingPeriod: domain.BillingMonth,
+				NextPaymentDate: dayPtr("2026-11-30")},
+			want: []event{
+				{kind: evCharge, charge: []time.Time{day("2026-11-30"), day("2026-12-30")}, next: day("2027-01-30")},
+			},
+		},
+		{
+			name:  "ended on 31.12",
+			today: "2027-01-01",
+			sub:   domain.Subscription{ID: 4, Status: domain.SubExpiringSoon, EndDate: dayPtr("2026-12-31")},
+			want:  []event{{kind: evExpired, status: domain.SubExpired, key: "sub_4_expired_2026-12-31"}},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := plan(c.sub, day(c.today), st)
+			if !reflect.DeepEqual(got, c.want) {
+				t.Errorf("plan =\n  %+v\nwant\n  %+v", got, c.want)
+			}
+		})
+	}
+}
+
 func TestDayIn(t *testing.T) {
 	msk, err := time.LoadLocation("Europe/Moscow")
 	if err != nil {
@@ -211,12 +265,23 @@ func TestDayIn(t *testing.T) {
 		{time.Date(2026, 10, 23, 20, 59, 0, 0, time.UTC), "2026-10-23"},
 		// 21:00 UTC is midnight in Moscow (UTC+3).
 		{time.Date(2026, 10, 23, 21, 0, 0, 0, time.UTC), "2026-10-24"},
+		{time.Date(2026, 12, 31, 20, 59, 0, 0, time.UTC), "2026-12-31"},
+		{time.Date(2026, 12, 31, 21, 0, 0, 0, time.UTC), "2027-01-01"},
 	}
 	for _, c := range cases {
 		got := dayIn(c.now, msk)
 		if got.Format(time.DateOnly) != c.want || got.Location() != time.UTC || got.Hour() != 0 {
 			t.Errorf("dayIn(%s) = %s, want %s at midnight UTC", c.now, got, c.want)
 		}
+	}
+}
+
+func TestDaysUntil(t *testing.T) {
+	if n := daysUntil(day("2026-12-30"), day("2027-01-02")); n != 3 {
+		t.Errorf("30.12 → 02.01: %d days, want 3", n)
+	}
+	if n := daysUntil(day("2028-02-27"), day("2028-03-01")); n != 3 {
+		t.Errorf("27.02 → 01.03 in a leap year: %d days, want 3", n)
 	}
 }
 

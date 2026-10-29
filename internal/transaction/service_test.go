@@ -125,7 +125,7 @@ type fixture struct {
 
 func newFixture() *fixture {
 	f := &fixture{repo: newFakeRepo(), audit: &testkit.Audit{}, admin: domain.User{ID: 1, Role: domain.RoleAdmin}}
-	f.svc = New(f.repo, fakeSubs{}, &testkit.Tx{}, f.audit)
+	f.svc = New(f.repo, fakeSubs{}, &testkit.Tx{}, f.audit, time.UTC)
 	return f
 }
 

@@ -40,16 +40,18 @@ func DayPtr(t *time.Time) any {
 }
 
 // Sheet is one tab of a workbook. Rows hold string, int, int64, float64,
-// bool, Money, Day, time.Time (written as date and time) or nil (an empty
-// cell); a pointer to one of these is followed.
+// bool, Money, Day, time.Time (written as date and time in the workbook's
+// zone) or nil (an empty cell); a pointer to one of these is followed.
 type Sheet struct {
 	Name   string
 	Header []string
 	Rows   [][]any
 }
 
-// Write builds a workbook from sheets, in order, and writes it to buf.
-func Write(buf *bytes.Buffer, sheets ...Sheet) error {
+// Write builds a workbook from sheets, in order, and writes it to buf. A cell
+// keeps no time zone, so moments (time.Time) are written as the time of day
+// in loc, the company's zone, whatever the server's own zone is.
+func Write(buf *bytes.Buffer, loc *time.Location, sheets ...Sheet) error {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
@@ -109,7 +111,7 @@ func Write(buf *bytes.Buffer, sheets ...Sheet) error {
 		for r, row := range sh.Rows {
 			for c, v := range row {
 				cell, _ := excelize.CoordinatesToCellName(c+1, r+2)
-				val, style, text := cellValue(v)
+				val, style, text := cellValue(v, loc)
 				if val == nil {
 					continue
 				}
@@ -144,7 +146,9 @@ func Write(buf *bytes.Buffer, sheets ...Sheet) error {
 
 // cellValue turns a row value into what excelize writes, the style to apply
 // and its text (for the column width). A nil value is an empty cell.
-func cellValue(v any) (val any, style, text string) {
+// excelize writes a time.Time as the time of day in its own location, hence
+// the In(loc).
+func cellValue(v any, loc *time.Location) (val any, style, text string) {
 	switch x := v.(type) {
 	case nil:
 		return nil, "", ""
@@ -152,32 +156,32 @@ func cellValue(v any) (val any, style, text string) {
 		if x == nil {
 			return nil, "", ""
 		}
-		return cellValue(*x)
+		return cellValue(*x, loc)
 	case *int:
 		if x == nil {
 			return nil, "", ""
 		}
-		return cellValue(*x)
+		return cellValue(*x, loc)
 	case *int64:
 		if x == nil {
 			return nil, "", ""
 		}
-		return cellValue(*x)
+		return cellValue(*x, loc)
 	case *float64:
 		if x == nil {
 			return nil, "", ""
 		}
-		return cellValue(*x)
+		return cellValue(*x, loc)
 	case *Money:
 		if x == nil {
 			return nil, "", ""
 		}
-		return cellValue(*x)
+		return cellValue(*x, loc)
 	case *time.Time:
 		if x == nil {
 			return nil, "", ""
 		}
-		return cellValue(*x)
+		return cellValue(*x, loc)
 	case Money:
 		n, err := strconv.ParseFloat(string(x), 64)
 		if err != nil {
@@ -187,7 +191,7 @@ func cellValue(v any) (val any, style, text string) {
 	case Day:
 		return time.Time(x), "day", "00.00.0000"
 	case time.Time:
-		return x, "time", "00.00.0000 00:00"
+		return x.In(loc), "time", "00.00.0000 00:00"
 	case string:
 		return x, "", x
 	default:
@@ -195,11 +199,12 @@ func cellValue(v any) (val any, style, text string) {
 	}
 }
 
-// Respond writes sheets as a download named filename. The workbook is built
-// in memory first, so a failure is still an ordinary JSON 500.
-func Respond(ctx context.Context, w http.ResponseWriter, filename string, sheets ...Sheet) {
+// Respond writes sheets as a download named filename, moments in loc (see
+// Write). The workbook is built in memory first, so a failure is still an
+// ordinary JSON 500.
+func Respond(ctx context.Context, w http.ResponseWriter, filename string, loc *time.Location, sheets ...Sheet) {
 	var buf bytes.Buffer
-	if err := Write(&buf, sheets...); err != nil {
+	if err := Write(&buf, loc, sheets...); err != nil {
 		httpx.Internal(ctx, w, fmt.Errorf("xlsx: %w", err))
 		return
 	}

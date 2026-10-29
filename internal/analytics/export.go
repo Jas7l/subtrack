@@ -136,7 +136,7 @@ func (h *handler) export(w http.ResponseWriter, r *http.Request) {
 	recSh.Rows = append(recSh.Rows, []any{"Итого", nil, nil, xlsx.Money(savings)})
 
 	sheets = append(sheets, topSh, spentSh, fcSh, recSh, ratesSheet(rates))
-	xlsx.Respond(ctx, w, xlsx.Filename("analytics", h.svc.now(), h.svc.loc), sheets...)
+	xlsx.Respond(ctx, w, xlsx.Filename("analytics", h.svc.now(), h.svc.loc), h.svc.loc, sheets...)
 }
 
 func summarySheet(s Summary) xlsx.Sheet {

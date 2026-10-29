@@ -10,6 +10,7 @@ import { homePath } from './lib/roles'
 import { AssignmentsPage } from './pages/AssignmentsPage'
 import { AuditPage } from './pages/AuditPage'
 import { DepartmentsPage } from './pages/DepartmentsPage'
+import { ErrorPage } from './pages/ErrorPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyRequestsPage } from './pages/MyRequestsPage'
 import { MySubscriptionsPage } from './pages/MySubscriptionsPage'
@@ -99,6 +100,8 @@ function Root() {
 export const router = createBrowserRouter([
   {
     element: <Root />,
+    // Something outside the pages crashed: the menu is gone as well.
+    errorElement: <ErrorPage fullScreen />,
     children: [
       { path: '/login', element: <LoginPage /> },
       {
@@ -108,16 +111,22 @@ export const router = createBrowserRouter([
           </RequireAuth>
         ),
         children: [
-          { index: true, element: <HomeRedirect /> },
-          ...pages.map((page) => ({
-            path: page.path,
-            element: (
-              <RequireRole roles={page.roles}>
-                <LazyPage Page={page.Page} />
-              </RequireRole>
-            ),
-          })),
-          { path: '*', element: <NotFoundPage /> },
+          {
+            // A page that crashed is replaced by ErrorPage, the menu stays.
+            errorElement: <ErrorPage />,
+            children: [
+              { index: true, element: <HomeRedirect /> },
+              ...pages.map((page) => ({
+                path: page.path,
+                element: (
+                  <RequireRole roles={page.roles}>
+                    <LazyPage Page={page.Page} />
+                  </RequireRole>
+                ),
+              })),
+              { path: '*', element: <NotFoundPage /> },
+            ],
+          },
         ],
       },
     ],
