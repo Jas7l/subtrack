@@ -12,6 +12,12 @@ const known: Record<string, string> = {
   'current password is incorrect': 'Текущий пароль указан неверно',
   'new password must differ from the current one': 'Новый пароль должен отличаться от текущего',
   'email is already taken': 'Этот email уже занят',
+  // "email "x" is not a valid address": matched by the prefix.
+  email: 'Неверный email',
+  'full_name must not be empty': 'Укажите ФИО',
+  'cost must be a non-negative amount with at most 2 decimals, like 1500.00':
+    'Стоимость — не меньше нуля, не больше 2 знаков после запятой',
+  'notification not found': 'Уведомление не найдено',
   'you cannot block yourself or remove your own admin role':
     'Нельзя заблокировать себя или снять с себя роль администратора',
   'the last active admin cannot be blocked or lose the admin role':
@@ -66,7 +72,7 @@ const known: Record<string, string> = {
   'password must be at least 8 characters': 'Пароль — не короче 8 символов',
   'password must be at most 72 bytes': 'Пароль слишком длинный',
   'seats_total is required for a group subscription': 'Укажите число мест',
-  'seats_total must be at least 1': 'Мест должно быть не меньше одного',
+  'seats_total must be between 1 and 2147483647': 'Мест — от одного до 2 147 483 647',
   'an individual subscription has exactly 1 seat; use type group for more':
     'У индивидуальной подписки ровно одно место: для нескольких выберите «Групповая»',
   'an enterprise subscription has no seat limit; omit seats_total':

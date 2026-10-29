@@ -34,6 +34,9 @@ export function useCreateTransaction() {
   })
 }
 
+// Pay and fail refresh even when they fail: a 409 «cannot move to that
+// status» means someone else has paid it meanwhile and the row is stale.
+
 // From pending or failed.
 export function usePayTransaction() {
   const queryClient = useQueryClient()
@@ -43,7 +46,7 @@ export function usePayTransaction() {
         method: 'POST',
         body,
       }),
-    onSuccess: () => afterChange(queryClient),
+    onSettled: () => afterChange(queryClient),
   })
 }
 
@@ -53,7 +56,7 @@ export function useFailTransaction() {
   return useMutation({
     mutationFn: (id: number) =>
       request<TransactionDTO>(`/transactions/${id}/fail`, { method: 'POST' }),
-    onSuccess: () => afterChange(queryClient),
+    onSettled: () => afterChange(queryClient),
   })
 }
 

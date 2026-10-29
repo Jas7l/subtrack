@@ -3,6 +3,7 @@ package subscription
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"subtrack/internal/auth"
 	"subtrack/internal/domain"
 	"subtrack/internal/paging"
+	"subtrack/internal/storage"
 )
 
 func TestCreateValidation(t *testing.T) {
@@ -50,6 +52,7 @@ func TestCreateValidation(t *testing.T) {
 		{"ends before start", func(s *domain.Subscription) { s.EndDate = ptr(day("2025-12-31")) }, apperr.ErrInvalidInput},
 		{"group without seats", func(s *domain.Subscription) { s.SeatsTotal = nil }, apperr.ErrInvalidInput},
 		{"group with 0 seats", func(s *domain.Subscription) { s.SeatsTotal = ptr(0) }, apperr.ErrInvalidInput},
+		{"seats past INT", func(s *domain.Subscription) { s.SeatsTotal = ptr(MaxSeats + 1) }, apperr.ErrInvalidInput},
 		{"individual with 3 seats", func(s *domain.Subscription) { s.Type = domain.SubIndividual; s.SeatsTotal = ptr(3) }, apperr.ErrInvalidInput},
 		{"enterprise with seats", func(s *domain.Subscription) { s.Type = domain.SubEnterprise }, apperr.ErrInvalidInput},
 	}
@@ -420,5 +423,23 @@ func TestAuditTrail(t *testing.T) {
 	}
 	if del := f.audit.Entries[5].Details; del["name"] != "Jira" {
 		t.Errorf("delete details: %+v", del)
+	}
+}
+
+// A department or currency deleted between the check and the write is
+// reported as such, not as a missing subscription.
+func TestMapWriteErrForeignKeys(t *testing.T) {
+	for _, tt := range []struct {
+		constraint string
+		want       error
+	}{
+		{"subscriptions_department_id_fkey", ErrUnknownDepartment},
+		{"subscriptions_currency_fkey", ErrUnknownCurrency},
+		{"subscriptions_created_by_fkey", ErrSubscriptionNotFound},
+	} {
+		err := fmt.Errorf("postgres: create subscription: %w", &storage.ForeignKeyError{Constraint: tt.constraint})
+		if got := mapWriteErr(err); !errors.Is(got, tt.want) {
+			t.Errorf("%s: got %v, want %v", tt.constraint, got, tt.want)
+		}
 	}
 }

@@ -289,6 +289,11 @@ func (s *Service) Create(ctx context.Context, actor domain.User, in CreateReques
 		}
 		return s.notifyReviewer(ctx, out, head)
 	})
+	// The currency was checked up front, but may be deleted meanwhile.
+	var fk *storage.ForeignKeyError
+	if errors.As(err, &fk) && fk.Constraint == "requests_currency_fkey" {
+		return domain.Request{}, fmt.Errorf("%w %s", ErrUnknownCurrency, r.Currency)
+	}
 	if err != nil {
 		return domain.Request{}, err
 	}

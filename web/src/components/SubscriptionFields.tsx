@@ -100,7 +100,7 @@ export function SubscriptionFields({
               },
             ]}
           >
-            <InputNumber<number> min={1} precision={0} style={{ width: '100%' }} />
+            <InputNumber<number> min={1} max={2147483647} precision={0} style={{ width: '100%' }} />
           </Form.Item>
         )}
       </div>

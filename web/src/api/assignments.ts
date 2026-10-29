@@ -34,11 +34,13 @@ export function useCreateAssignment() {
   })
 }
 
+// A revoke refreshes even when it fails: a 409 «already revoked» (by someone
+// else, or with the whole subscription) means the row on screen is stale.
 export function useRevokeAssignment() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: number) =>
       request<AssignmentDTO>(`/assignments/${id}/revoke`, { method: 'POST' }),
-    onSuccess: () => afterChange(queryClient),
+    onSettled: () => afterChange(queryClient),
   })
 }

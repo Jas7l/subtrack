@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -418,6 +419,10 @@ func reopen(cur domain.Subscription, sub *domain.Subscription, p domain.Subscrip
 	return true
 }
 
+// MaxSeats is the most seats a group subscription may have: seats_total is
+// an INT column, and a larger number would fail in the database as a 500.
+const MaxSeats = math.MaxInt32
+
 // costRe is a non-negative amount that fits NUMERIC(14,2).
 var costRe = regexp.MustCompile(`^[0-9]{1,12}(\.[0-9]{1,2})?$`)
 
@@ -486,8 +491,8 @@ func normalize(s *domain.Subscription) error {
 		if s.SeatsTotal == nil {
 			return fmt.Errorf("%w: seats_total is required for a group subscription", apperr.ErrInvalidInput)
 		}
-		if *s.SeatsTotal < 1 {
-			return fmt.Errorf("%w: seats_total must be at least 1", apperr.ErrInvalidInput)
+		if *s.SeatsTotal < 1 || *s.SeatsTotal > MaxSeats {
+			return fmt.Errorf("%w: seats_total must be between 1 and %d", apperr.ErrInvalidInput, MaxSeats)
 		}
 	case domain.SubEnterprise:
 		if s.SeatsTotal != nil {
@@ -528,6 +533,17 @@ func mapWriteErr(err error) error {
 	var ce *storage.CheckError
 	if errors.As(err, &ce) && ce.Constraint == "subscriptions_seats_check" {
 		return ErrSeatsBelowUsed
+	}
+	// The department and the currency were checked up front, but may be
+	// deleted meanwhile; that is not "no such subscription".
+	var fk *storage.ForeignKeyError
+	if errors.As(err, &fk) {
+		switch fk.Constraint {
+		case "subscriptions_department_id_fkey":
+			return ErrUnknownDepartment
+		case "subscriptions_currency_fkey":
+			return ErrUnknownCurrency
+		}
 	}
 	return apperr.MapStorage(err, ErrSubscriptionNotFound)
 }
