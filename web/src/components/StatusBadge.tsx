@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react'
-import type { RequestStatus, SubscriptionStatus, TransactionStatus } from '../api/types'
+import type {
+  ReleaseStatus,
+  RequestStatus,
+  SubscriptionStatus,
+  TransactionStatus,
+} from '../api/types'
 import {
+  releaseStatusLabels,
   requestStatusLabels,
   subscriptionStatusLabels,
   transactionStatusLabels,
@@ -41,6 +47,17 @@ const requestTones: Record<RequestStatus, Tone> = {
 
 export function RequestStatusBadge({ status }: { status: RequestStatus }) {
   return <StatusBadge tone={requestTones[status]}>{requestStatusLabels[status]}</StatusBadge>
+}
+
+const releaseTones: Record<ReleaseStatus, Tone> = {
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'error',
+  cancelled: 'muted',
+}
+
+export function ReleaseStatusBadge({ status }: { status: ReleaseStatus }) {
+  return <StatusBadge tone={releaseTones[status]}>{releaseStatusLabels[status]}</StatusBadge>
 }
 
 const transactionTones: Record<TransactionStatus, Tone> = {

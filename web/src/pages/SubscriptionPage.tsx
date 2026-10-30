@@ -21,7 +21,10 @@ import { useMe } from '../auth/AuthContext'
 import { AuditHistory } from '../components/AuditHistory'
 import { GrantLicenceModal } from '../components/GrantLicenceModal'
 import { PageHeader } from '../components/PageHeader'
+import { CancelReleaseButton } from '../components/CancelReleaseButton'
 import { QueryState } from '../components/QueryState'
+import { ReleasePendingLink } from '../components/ReleasePendingLink'
+import { ReleaseRequestModal } from '../components/ReleaseRequestModal'
 import { RevokeLicenceButton } from '../components/RevokeLicenceButton'
 import { ServiceTile } from '../components/ServiceTile'
 import { SubscriptionFormModal } from '../components/SubscriptionFormModal'
@@ -210,7 +213,16 @@ function Holders({ subscription: s }: { subscription: SubscriptionDTO }) {
       },
     },
     { title: 'Выдана', key: 'assigned', render: (_, a) => formatDay(a.assigned_at) },
-    { key: 'actions', align: 'right', render: (_, a) => <RevokeLicenceButton assignment={a} /> },
+    {
+      key: 'actions',
+      align: 'right',
+      render: (_, a) => (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+          {a.release_request_id !== null && <ReleasePendingLink id={a.release_request_id} />}
+          <RevokeLicenceButton assignment={a} />
+        </span>
+      ),
+    },
   ]
 
   return (
@@ -309,8 +321,11 @@ function Payments({ subscription: s }: { subscription: SubscriptionDTO }) {
   )
 }
 
+// MyLicence: the caller's own licence of a subscription they do not manage.
+// Giving it back is a release request to whoever manages it.
 function MyLicence({ subscription: s }: { subscription: SubscriptionDTO }) {
   const me = useMe()
+  const [asking, setAsking] = useState(false)
   const mine = useAssignments({ subscription_id: s.id, user_id: me.id, status: 'active', limit: 1 })
   const licence = mine.data?.items[0]
   const holders = s.seats_used
@@ -320,10 +335,30 @@ function MyLicence({ subscription: s }: { subscription: SubscriptionDTO }) {
       {mine.error ? (
         <Alert type="error" showIcon title={errorText(mine.error)} />
       ) : mine.isPending ? null : licence ? (
-        <p style={{ margin: 0 }}>
-          У вас есть лицензия с {formatDay(licence.assigned_at)}. Всего ей пользуются {holders}{' '}
-          {plural(holders, 'человек', 'человека', 'человек')}.
-        </p>
+        <>
+          <p style={{ marginTop: 0 }}>
+            У вас есть лицензия с {formatDay(licence.assigned_at)}. Всего ей пользуются {holders}{' '}
+            {plural(holders, 'человек', 'человека', 'человек')}.
+          </p>
+          {licence.release_request_id !== null ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+              <ReleasePendingLink id={licence.release_request_id} />
+              <CancelReleaseButton id={licence.release_request_id} label="Отозвать заявку" />
+            </span>
+          ) : (
+            <>
+              <Button danger onClick={() => setAsking(true)}>
+                Отказаться…
+              </Button>
+              <ReleaseRequestModal
+                assignment={licence}
+                departmentName={s.department_name}
+                open={asking}
+                onClose={() => setAsking(false)}
+              />
+            </>
+          )}
+        </>
       ) : (
         <p style={{ margin: 0 }}>У вас нет лицензии этой подписки.</p>
       )}

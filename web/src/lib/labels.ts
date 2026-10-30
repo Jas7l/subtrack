@@ -1,6 +1,7 @@
 import type {
   AssignmentStatus,
   BillingPeriod,
+  ReleaseStatus,
   RequestStatus,
   Role,
   SubscriptionStatus,
@@ -55,3 +56,11 @@ export const requestStatusLabels: Record<RequestStatus, string> = {
 
 export const isPending = (status: RequestStatus) =>
   status === 'pending_manager' || status === 'pending_admin'
+
+// A request to give a licence back.
+export const releaseStatusLabels: Record<ReleaseStatus, string> = {
+  pending: 'Ждёт решения',
+  approved: 'Лицензия отозвана',
+  rejected: 'Отклонена',
+  cancelled: 'Отменена',
+}

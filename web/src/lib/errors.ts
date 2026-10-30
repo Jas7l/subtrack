@@ -88,6 +88,21 @@ const known: Record<string, string> = {
   'user not found': 'Пользователь не найден',
   'request not found': 'Заявка не найдена',
   'subscription not found': 'Подписка не найдена',
+  'release request not found': 'Заявка на отказ не найдена',
+  'the release request is already decided or cancelled':
+    'По заявке на отказ уже принято решение или она отменена',
+  'a release request for this licence already waits': 'Заявка на отказ от этой лицензии уже подана',
+  'you manage this subscription: revoke the licence yourself':
+    'Вы распоряжаетесь этой подпиской: отзовите лицензию сами',
+  'assignment_id is required': 'Выберите лицензию',
+  'insufficient permissions: only the licence holder asks to give it back':
+    'Отказаться от лицензии может только её владелец',
+  "insufficient permissions: only the admin or a manager of the subscription's department decides a release request":
+    'Решить заявку на отказ может начальник отдела подписки или администратор',
+  'insufficient permissions: only the requester can cancel a release request':
+    'Отменить заявку на отказ может только её автор',
+  "insufficient permissions: only the admin or a manager of the subscription's department revokes a licence; file a release request to give it back":
+    'Отозвать лицензию может начальник отдела подписки или администратор. Чтобы отказаться, подайте заявку',
 }
 
 const byStatus: Record<number, string> = {
@@ -115,6 +130,17 @@ function knownText(description: string): string | undefined {
 // cancelled or moved to the other stage meanwhile (409 «the request …»).
 export function requestMovedOn(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409 && err.description.startsWith('the request ')
+}
+
+// releaseMovedOn: the same for a release request — decided or cancelled
+// meanwhile, or closed with its licence revoked another way.
+export function releaseMovedOn(err: unknown): boolean {
+  return (
+    err instanceof ApiError &&
+    err.status === 409 &&
+    (err.description.startsWith('the release request ') ||
+      err.description === 'the licence is already revoked')
+  )
 }
 
 export function errorText(err: unknown): string {

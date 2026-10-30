@@ -6,6 +6,7 @@ import { useAssignments } from '../api/assignments'
 import type { AssignmentDTO, AssignmentStatus } from '../api/types'
 import { GrantLicenceModal } from '../components/GrantLicenceModal'
 import { PageHeader } from '../components/PageHeader'
+import { ReleasePendingLink } from '../components/ReleasePendingLink'
 import { RevokeLicenceButton } from '../components/RevokeLicenceButton'
 import { ServiceTile } from '../components/ServiceTile'
 import { StatusBadge } from '../components/StatusBadge'
@@ -57,9 +58,12 @@ const columns: TableProps<AssignmentDTO>['columns'] = [
     title: 'Статус',
     key: 'status',
     render: (_, a) => (
-      <StatusBadge tone={a.status === 'active' ? 'success' : 'muted'}>
-        {assignmentStatusLabels[a.status]}
-      </StatusBadge>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <StatusBadge tone={a.status === 'active' ? 'success' : 'muted'}>
+          {assignmentStatusLabels[a.status]}
+        </StatusBadge>
+        {a.release_request_id !== null && <ReleasePendingLink id={a.release_request_id} />}
+      </span>
     ),
   },
   {

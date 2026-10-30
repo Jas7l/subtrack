@@ -25,6 +25,7 @@ export const entityLabels: Record<AuditEntityType, string> = {
   subscription: 'Подписка',
   assignment: 'Лицензия',
   request: 'Заявка',
+  release_request: 'Отказ от лицензии',
   transaction: 'Платёж',
   settings: 'Настройки',
   currency: 'Валюта',
@@ -48,6 +49,10 @@ export const actionLabels: Record<string, string> = {
   'request.approve': 'Заявка одобрена',
   'request.reject': 'Заявка отклонена',
   'request.cancel': 'Заявка отменена',
+  'release_request.create': 'Подан отказ от лицензии',
+  'release_request.approve': 'Отказ одобрен',
+  'release_request.reject': 'Отказ отклонён',
+  'release_request.cancel': 'Отказ отменён',
   'transaction.create': 'Платёж создан',
   'transaction.pay': 'Платёж оплачен',
   'transaction.fail': 'Ошибка оплаты',
@@ -90,6 +95,8 @@ export function entityLink(e: AuditEntryDTO): string | null {
       return id === null ? null : `/subscriptions/${id}`
     case 'request':
       return id === null ? null : `/requests/${id}`
+    case 'release_request':
+      return id === null ? null : `/release-requests/${id}`
     case 'user':
       return id === null ? null : `/users/${id}`
     case 'department':
@@ -115,6 +122,8 @@ export function entityText(e: AuditEntryDTO): string {
   switch (e.entity_type) {
     case 'assignment':
       return d.subscription && d.user ? `${label}: ${str(d.subscription)} → ${str(d.user)}` : `${label} #${e.entity_id}`
+    case 'release_request':
+      return d.subscription ? `${label} «${str(d.subscription)}»` : `${label} #${e.entity_id}`
     case 'currency':
       return `${label} ${str(d.code) ?? ''}`.trim()
     case 'settings':
@@ -157,6 +166,11 @@ const fieldLabels: Record<string, string> = {
   seats_total: 'Мест',
   licences_revoked: 'Отозвано лицензий',
   requests_cancelled: 'Отменено заявок',
+  release_requests_cancelled: 'Отменено отказов',
+  release_requests_closed: 'Закрыто отказов',
+  release_request_id: 'Заявка на отказ',
+  assignment_id: 'Лицензия',
+  reason: 'Причина',
   subscription_id: 'Подписка',
   user_id: 'Сотрудник',
   stage: 'Решение',
@@ -238,6 +252,10 @@ export function detailRows(e: AuditEntryDTO, departments: Map<number, string>): 
         return row(str(d.subscription) ?? `#${String(v)}`, `/subscriptions/${String(v)}`)
       case 'user_id':
         return row(str(d.user) ?? `#${String(v)}`, `/users/${String(v)}`)
+      case 'release_request_id':
+        return row(`№${String(v)}`, `/release-requests/${String(v)}`)
+      case 'assignment_id':
+        return row(`#${String(v)}`)
       case 'stage':
         return row(v === 'manager' ? 'начальника отдела' : v === 'admin' ? 'администратора' : String(v))
       case 'rate_to_rub':

@@ -11,6 +11,7 @@ import { useAuth, useMe } from '../auth/AuthContext'
 import { GrantLicenceModal } from '../components/GrantLicenceModal'
 import { PageHeader } from '../components/PageHeader'
 import { QueryState } from '../components/QueryState'
+import { ReleasePendingLink } from '../components/ReleasePendingLink'
 import { RevokeLicenceButton } from '../components/RevokeLicenceButton'
 import { ServiceTile } from '../components/ServiceTile'
 import { RequestStatusBadge, UserStatusBadge } from '../components/StatusBadge'
@@ -32,6 +33,10 @@ const licenceColumns: NonNullable<TableProps<AssignmentDTO>['columns']> = [
     ),
   },
   { title: 'Выдана', key: 'assigned', render: (_, a) => formatDay(a.assigned_at) },
+  {
+    key: 'release',
+    render: (_, a) => a.release_request_id !== null && <ReleasePendingLink id={a.release_request_id} />,
+  },
 ]
 
 const requestColumns: TableProps<RequestDTO>['columns'] = [

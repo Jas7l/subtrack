@@ -18,6 +18,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { RecommendationsPage } from './pages/RecommendationsPage'
+import { ReleaseRequestPage } from './pages/ReleaseRequestPage'
 import { RequestPage } from './pages/RequestPage'
 import { RequestsPage } from './pages/RequestsPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -52,6 +53,7 @@ const pages: PageDef[] = [
   { path: '/my/subscriptions', roles: STAFF, Page: MySubscriptionsPage },
   { path: '/my/requests', roles: STAFF, Page: MyRequestsPage },
   { path: '/requests/:id', roles: ALL, Page: RequestPage },
+  { path: '/release-requests/:id', roles: ALL, Page: ReleaseRequestPage },
   { path: '/notifications', roles: ALL, Page: NotificationsPage },
   { path: '/profile', roles: ALL, Page: ProfilePage },
   { path: '/dashboard', roles: BOSSES, Page: DashboardPage },

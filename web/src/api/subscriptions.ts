@@ -32,10 +32,13 @@ export function useSubscription(id: number) {
   })
 }
 
-// Cancelling or deleting revokes the licences; any change moves the numbers.
+// Cancelling or deleting revokes the licences and closes the release
+// requests that waited; moving it to another department moves who decides
+// them; any change moves the numbers.
 function afterChange(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
   void queryClient.invalidateQueries({ queryKey: ['assignments'] })
+  void queryClient.invalidateQueries({ queryKey: ['releases'] })
   void queryClient.invalidateQueries({ queryKey: ['analytics'] })
 }
 

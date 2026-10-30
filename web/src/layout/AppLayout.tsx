@@ -1,13 +1,14 @@
 import { LogoutOutlined, UserOutlined } from '@ant-design/icons'
 import { Badge, Dropdown, Menu, type MenuProps } from 'antd'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
+import { useInboxReleasesCount } from '../api/releases'
 import { useHeadlessRequests, usePendingRequestsCount } from '../api/requests'
 import { useAuth, useMe } from '../auth/AuthContext'
 import { Logo } from '../components/Logo'
 import { NotificationBell } from '../components/NotificationBell'
 import { UserAvatar } from '../components/UserAvatar'
 import { roleLabels } from '../lib/labels'
-import { inboxStatus } from '../lib/permissions'
+import { hasReleaseInbox, inboxStatus } from '../lib/permissions'
 import { homePath, isGroup, navByRole, type NavLeaf } from '../lib/roles'
 
 // selectedKey picks the menu item for the current page: the longest item path
@@ -27,6 +28,7 @@ export function AppLayout() {
 
   const pending = usePendingRequestsCount(inboxStatus(me, isHead))
   const headless = useHeadlessRequests(me.role === 'admin')
+  const releases = useInboxReleasesCount(hasReleaseInbox(me))
 
   const nav = navByRole[me.role]
   const leaves = nav.flatMap((item) => (isGroup(item) ? item.children : [item]))
@@ -38,7 +40,7 @@ export function AppLayout() {
       <Link to={leaf.path} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         {leaf.label}
         {leaf.requestsBadge && (
-          <Badge count={(pending.data ?? 0) + headless.count} size="small" />
+          <Badge count={(pending.data ?? 0) + headless.count + (releases.data ?? 0)} size="small" />
         )}
       </Link>
     ),

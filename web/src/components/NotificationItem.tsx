@@ -4,6 +4,7 @@ import {
   CloseCircleOutlined,
   CreditCardOutlined,
   FileAddOutlined,
+  RollbackOutlined,
   StopOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
@@ -18,6 +19,9 @@ const look: Record<NotificationType, { icon: ReactNode; tone: Tone }> = {
   request_created: { icon: <FileAddOutlined />, tone: 'accent' },
   request_approved: { icon: <CheckCircleOutlined />, tone: 'success' },
   request_rejected: { icon: <CloseCircleOutlined />, tone: 'error' },
+  release_created: { icon: <RollbackOutlined />, tone: 'warning' },
+  release_approved: { icon: <CheckCircleOutlined />, tone: 'success' },
+  release_rejected: { icon: <CloseCircleOutlined />, tone: 'error' },
 }
 
 // NotificationItem is one row of the bell popup and of the notifications page.

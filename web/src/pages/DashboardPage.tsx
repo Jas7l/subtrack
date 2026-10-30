@@ -6,8 +6,10 @@ import {
   WalletOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Card, Empty, Spin } from 'antd'
+import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useByCategory, useForecast, useSummary } from '../api/analytics'
+import { useReleases } from '../api/releases'
 import { useRequests } from '../api/requests'
 import { useAuth, useMe } from '../auth/AuthContext'
 import { CategoryPie } from '../components/CategoryPie'
@@ -17,9 +19,21 @@ import { PrintButton } from '../components/PrintButton'
 import { NoDepartment } from '../components/QueryState'
 import { ServiceTile } from '../components/ServiceTile'
 import { StatCard } from '../components/StatCard'
+import { StatusBadge } from '../components/StatusBadge'
 import { errorText } from '../lib/errors'
 import { formatMoney, fromNow, plural } from '../lib/format'
 import { AdminDashboard } from './AdminDashboard'
+
+// One line of the manager's «Ждут вашего решения».
+interface InboxItem {
+  key: string
+  to: string
+  tile: string
+  title: string
+  who: string
+  at: string
+  extra: ReactNode
+}
 
 // DashboardPage: the admin's dashboard for the company, or the manager's
 // budget of their department.
@@ -36,7 +50,11 @@ function ManagerDashboard() {
   const summary = useSummary()
   const categories = useByCategory()
   const forecast = useForecast(12)
+  // What waits for the manager: requests for a subscription (the head
+  // decides those) and requests to give a licence back (any manager of the
+  // department), newest first, the latest five together.
   const inbox = useRequests({ status: 'pending_manager', limit: 5 })
+  const releases = useReleases({ inbox: true, limit: 5 })
 
   if (me.department_id === null) return <NoDepartment title="Бюджет отдела" />
   if (summary.isPending || departmentLoading) {
@@ -50,6 +68,31 @@ function ManagerDashboard() {
     return <Alert type="error" showIcon title={errorText(summary.error)} />
   }
   const s = summary.data
+  const waiting: InboxItem[] = [
+    ...(isHead ? (inbox.data?.items ?? []) : []).map((r) => ({
+      key: `request-${r.id}`,
+      to: `/requests/${r.id}`,
+      tile: r.name,
+      title: r.name,
+      who: r.requester_name,
+      at: r.created_at,
+      extra: formatMoney(r.estimated_cost, r.currency),
+    })),
+    ...(releases.data?.items ?? []).map((r) => ({
+      key: `release-${r.id}`,
+      to: `/release-requests/${r.id}`,
+      tile: r.subscription_name,
+      title: `Отказ от «${r.subscription_name}»`,
+      who: r.requester_name,
+      at: r.created_at,
+      extra: <StatusBadge tone="warning">отказ</StatusBadge>,
+    })),
+  ]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 5)
+  const waitingTotal = (isHead ? (inbox.data?.total ?? 0) : 0) + (releases.data?.total ?? 0)
+  const waitingError = (isHead ? inbox.error : null) ?? releases.error
+  const waitingLoading = (isHead && inbox.isPending) || releases.isPending
 
   return (
     <>
@@ -101,42 +144,35 @@ function ManagerDashboard() {
       </div>
 
       <div className="dash-grid">
-        {isHead && (
-          <Card
-            variant="borderless"
-            title={`Ждут вашего решения · ${inbox.data?.total ?? 0}`}
-            extra={<Link to="/requests">Все заявки</Link>}
-          >
-            {inbox.error ? (
-              <Alert type="error" showIcon title={errorText(inbox.error)} />
-            ) : (inbox.data?.items.length ?? 0) === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={inbox.isPending ? 'Загрузка…' : 'Новых заявок нет'}
-              />
-            ) : (
-              <div className="inbox-list">
-                {inbox.data?.items.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    className="inbox-item"
-                    onClick={() => navigate(`/requests/${r.id}`)}
-                  >
-                    <ServiceTile name={r.name} size={36} />
-                    <span className="inbox-text">
-                      <span className="cell-title">{r.name}</span>
-                      <span className="cell-sub">
-                        {r.requester_name} · {fromNow(r.created_at)}
-                      </span>
+        <Card
+          variant="borderless"
+          title={`Ждут вашего решения · ${waitingTotal}`}
+          extra={<Link to="/requests">Все заявки</Link>}
+        >
+          {waitingError ? (
+            <Alert type="error" showIcon title={errorText(waitingError)} />
+          ) : waiting.length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={waitingLoading ? 'Загрузка…' : 'Новых заявок нет'}
+            />
+          ) : (
+            <div className="inbox-list">
+              {waiting.map((it) => (
+                <button key={it.key} type="button" className="inbox-item" onClick={() => navigate(it.to)}>
+                  <ServiceTile name={it.tile} size={36} />
+                  <span className="inbox-text">
+                    <span className="cell-title">{it.title}</span>
+                    <span className="cell-sub">
+                      {it.who} · {fromNow(it.at)}
                     </span>
-                    <span className="inbox-cost">{formatMoney(r.estimated_cost, r.currency)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </Card>
-        )}
+                  </span>
+                  <span className="inbox-cost">{it.extra}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
         <Card variant="borderless" title="Расходы по категориям" extra={<span className="cell-sub">в месяц</span>}>
           {categories.error ? (
             <Alert type="error" showIcon title={errorText(categories.error)} />

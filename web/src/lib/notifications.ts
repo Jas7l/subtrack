@@ -14,17 +14,20 @@ export function notificationLink(n: NotificationDTO): string | null {
       return `/requests/${n.entity_id}`
     case 'subscription':
       return `/subscriptions/${n.entity_id}`
+    case 'release_request':
+      return `/release-requests/${n.entity_id}`
     default:
       return null
   }
 }
 
 // What a notification about each kind of thing may have changed: a decided
-// request also hands out a licence.
+// request also hands out a licence, a decided release request revokes one.
 const staleAfter: Partial<Record<NotificationEntity, string[]>> = {
   request: ['requests', 'subscriptions', 'assignments'],
   subscription: ['subscriptions', 'assignments'],
   transaction: ['transactions'],
+  release_request: ['releases', 'subscriptions', 'assignments'],
 }
 
 // useOpenNotification is a click on a notification: it marks it read and

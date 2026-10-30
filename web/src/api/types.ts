@@ -64,8 +64,11 @@ export type NotificationType =
   | 'request_created'
   | 'request_approved'
   | 'request_rejected'
+  | 'release_created'
+  | 'release_approved'
+  | 'release_rejected'
 
-export type NotificationEntity = 'request' | 'subscription' | 'transaction'
+export type NotificationEntity = 'request' | 'subscription' | 'transaction' | 'release_request'
 
 export interface NotificationDTO {
   id: number
@@ -117,6 +120,8 @@ export interface AssignmentDTO {
   id: number
   subscription_id: number
   subscription_name: string
+  // null: a company-wide subscription.
+  subscription_department_id: number | null
   user_id: number
   user_name: string
   status: AssignmentStatus
@@ -128,6 +133,37 @@ export interface AssignmentDTO {
   revoked_by: number | null
   revoked_by_name: string | null
   revoked_at: string | null
+  // The holder's request to give the licence back that still waits.
+  release_request_id: number | null
+}
+
+export type ReleaseStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+// A holder asking to give a licence back. department_id is the
+// subscription's department now — whoever manages it decides (null: a
+// company-wide subscription, the admin's).
+export interface ReleaseRequestDTO {
+  id: number
+  assignment_id: number
+  subscription_id: number
+  subscription_name: string
+  department_id: number | null
+  department_name: string | null
+  requester_id: number
+  requester_name: string
+  reason: string
+  status: ReleaseStatus
+  decided_by: number | null
+  decided_by_name: string | null
+  comment: string
+  decided_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateReleaseBody {
+  assignment_id: number
+  reason?: string
 }
 
 export type RequestStatus =
@@ -460,6 +496,7 @@ export type AuditEntityType =
   | 'subscription'
   | 'assignment'
   | 'request'
+  | 'release_request'
   | 'transaction'
   | 'settings'
   | 'currency'

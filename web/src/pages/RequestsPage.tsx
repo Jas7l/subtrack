@@ -1,19 +1,22 @@
-import { Alert, Badge, Button, Card, Select, Spin, Table, Tabs, type TableProps } from 'antd'
+import { Alert, Badge, Button, Card, Segmented, Select, Spin, Table, Tabs, type TableProps } from 'antd'
+import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router'
+import { useInboxReleasesCount, useReleases } from '../api/releases'
 import { useHeadlessRequests, useRequests } from '../api/requests'
-import type { RequestDTO, RequestStatus } from '../api/types'
+import type { ReleaseStatus, RequestDTO, RequestStatus } from '../api/types'
 import { useAuth, useMe } from '../auth/AuthContext'
 import { DepartmentSelect } from '../components/DepartmentSelect'
 import { PageHeader } from '../components/PageHeader'
+import { ReleasesTable } from '../components/ReleasesTable'
 import { ServiceTile } from '../components/ServiceTile'
 import { RequestStatusBadge } from '../components/StatusBadge'
 import { UserAvatar } from '../components/UserAvatar'
 import { UserSelect } from '../components/UserSelect'
 import { errorText } from '../lib/errors'
 import { formatDay, formatMoney, plural } from '../lib/format'
-import { requestStatusLabels } from '../lib/labels'
-import { inboxStatus } from '../lib/permissions'
-import { useLastPage, useUrlState } from '../lib/urlState'
+import { releaseStatusLabels, requestStatusLabels } from '../lib/labels'
+import { hasReleaseInbox, inboxStatus } from '../lib/permissions'
+import { useLastPage, useUrlState, type UrlState } from '../lib/urlState'
 
 const columns: NonNullable<TableProps<RequestDTO>['columns']> = [
   {
@@ -66,20 +69,98 @@ const statusOptions = (Object.keys(requestStatusLabels) as RequestStatus[]).map(
   label: requestStatusLabels[s],
 }))
 
-// RequestsPage is one page for both roles. «Входящие» / «Ждут меня» are the
-// requests waiting for the caller's decision (pending_manager for a
-// department head, pending_admin for the admin); the second tab is every
-// request the server shows — the department's for a manager, all for the
-// admin, with filters by status, department and requester. A manager who is
-// not a head sees only the second, without tabs.
+const releaseStatusOptions = (Object.keys(releaseStatusLabels) as ReleaseStatus[]).map((s) => ({
+  value: s,
+  label: releaseStatusLabels[s],
+}))
+
+// Switching the kind or a tab drops the filters of «Все».
+const noFilters = { status: null, department_id: null, requester_id: null }
+
+// RequestsPage is one page for both roles, with two kinds of requests:
+// for a subscription (?kind absent) and to give a licence back
+// (?kind=release). Each has «Входящие» / «Ждут меня» — what waits for the
+// caller's decision — and a tab with every request the server shows (the
+// department's for a manager, all for the admin, with filters). The switch
+// counts what waits in each kind; the menu badge is their sum.
 export function RequestsPage() {
   const me = useMe()
   const admin = me.role === 'admin'
   const { isHead, departmentLoading } = useAuth()
-  const navigate = useNavigate()
   const url = useUrlState()
+  const kind = url.get('kind') === 'release' ? 'release' : 'subscription'
 
+  // The same queries as the tabs below (shared through the cache).
   const waiting = inboxStatus(me, isHead)
+  const requestsInbox = useRequests({ status: waiting ?? undefined, limit: 1 })
+  const headless = useHeadlessRequests(admin)
+  const releasesInbox = useInboxReleasesCount(hasReleaseInbox(me))
+
+  if (departmentLoading) {
+    return (
+      <div className="page-spin">
+        <Spin size="large" />
+      </div>
+    )
+  }
+
+  const requestsCount = (waiting !== null ? (requestsInbox.data?.total ?? 0) : 0) + headless.count
+  const releasesCount = releasesInbox.data ?? 0
+  const option = (label: string, count: number): ReactNode => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      {label} <Badge count={count} size="small" />
+    </span>
+  )
+
+  const subtitle =
+    kind === 'release'
+      ? admin
+        ? 'Отказы от лицензий решают начальники отделов подписок; вам — те, что решить некому, но закрыть можно любую'
+        : me.department_id === null
+          ? 'Вы не привязаны к отделу: здесь только ваши заявки'
+          : 'Сотрудники отказываются от лицензий подписок вашего отдела: одобрите — лицензия освободится'
+      : admin
+        ? 'Заявки, согласованные начальниками, ждут вашего финального решения'
+        : isHead
+          ? 'Заявки сотрудников ждут вашего решения, затем уходят администратору'
+          : me.department_id === null
+            ? 'Вы не привязаны к отделу: здесь только ваши заявки'
+            : 'Решения по заявкам принимает начальник отдела'
+
+  return (
+    <>
+      <PageHeader title={admin ? 'Все заявки' : 'Заявки отдела'} subtitle={subtitle} />
+      <Segmented
+        value={kind}
+        options={[
+          { value: 'subscription', label: option('На подписку', requestsCount) },
+          { value: 'release', label: option('На отказ', releasesCount) },
+        ]}
+        onChange={(v) => url.set({ kind: v === 'release' ? 'release' : null, tab: null, ...noFilters })}
+        style={{ marginBottom: 20 }}
+      />
+      {kind === 'release' ? (
+        <ReleaseRequests url={url} />
+      ) : (
+        <SubscriptionRequests url={url} waiting={waiting} headless={headless} />
+      )}
+    </>
+  )
+}
+
+function SubscriptionRequests({
+  url,
+  waiting,
+  headless,
+}: {
+  url: UrlState
+  waiting: ReturnType<typeof inboxStatus>
+  headless: ReturnType<typeof useHeadlessRequests>
+}) {
+  const me = useMe()
+  const admin = me.role === 'admin'
+  const navigate = useNavigate()
+
   const tab = waiting !== null && url.get('tab') !== 'all' ? 'inbox' : 'all'
   const filters: Record<string, string> = {}
   if (admin && tab === 'all') {
@@ -97,15 +178,6 @@ export function RequestsPage() {
   useLastPage(url, requests.data?.total)
   // The inbox count stays on its tab while «Все» is open.
   const inbox = useRequests({ status: waiting ?? undefined, limit: 1 })
-  const headless = useHeadlessRequests(admin)
-
-  if (departmentLoading) {
-    return (
-      <div className="page-spin">
-        <Spin size="large" />
-      </div>
-    )
-  }
 
   const shown = admin ? columns : columns.filter((c) => c.key !== 'department')
   // pending_manager nobody else can decide (no head, or the head made the
@@ -180,32 +252,15 @@ export function RequestsPage() {
     </>
   )
 
-  const subtitle = admin
-    ? 'Заявки, согласованные начальниками, ждут вашего финального решения'
-    : isHead
-      ? 'Заявки сотрудников ждут вашего решения, затем уходят администратору'
-      : me.department_id === null
-        ? 'Вы не привязаны к отделу: здесь только ваши заявки'
-        : 'Решения по заявкам принимает начальник отдела'
-
   return (
     <>
-      <PageHeader title={admin ? 'Все заявки' : 'Заявки отдела'} subtitle={subtitle} />
       {requests.error && (
         <Alert type="error" showIcon title={errorText(requests.error)} style={{ marginBottom: 24 }} />
       )}
       {waiting !== null ? (
         <Tabs
           activeKey={tab}
-          // Switching tabs drops the filters of «Все».
-          onChange={(key) =>
-            url.set({
-              tab: key === 'all' ? 'all' : null,
-              status: null,
-              department_id: null,
-              requester_id: null,
-            })
-          }
+          onChange={(key) => url.set({ tab: key === 'all' ? 'all' : null, ...noFilters })}
           items={[
             {
               key: 'inbox',
@@ -218,6 +273,120 @@ export function RequestsPage() {
               children: (
                 <>
                   {headlessNote}
+                  {table}
+                </>
+              ),
+            },
+            { key: 'all', label: admin ? 'Все' : 'Все заявки отдела', children: table },
+          ]}
+        />
+      ) : (
+        table
+      )}
+    </>
+  )
+}
+
+// ReleaseRequests: requests to give a licence back. Whoever manages the
+// subscription decides: a manager of its department — every one of them
+// has an inbox, not only the head — or the admin, whose inbox holds only
+// those nobody else can decide (the server picks them); the admin may still
+// close any from «Все».
+function ReleaseRequests({ url }: { url: UrlState }) {
+  const me = useMe()
+  const admin = me.role === 'admin'
+  const hasInbox = hasReleaseInbox(me)
+
+  const tab = hasInbox && url.get('tab') !== 'all' ? 'inbox' : 'all'
+  const filters: Record<string, string> = {}
+  if (admin && tab === 'all') {
+    filters.status = url.get('status')
+    filters.department_id = url.get('department_id')
+    filters.requester_id = url.get('requester_id')
+  }
+  const filtered = Object.values(filters).some(Boolean)
+  const releases = useReleases({
+    ...filters,
+    inbox: tab === 'inbox' ? true : undefined,
+    limit: url.pageSize,
+    offset: url.offset,
+  })
+  useLastPage(url, releases.data?.total)
+  const inbox = useInboxReleasesCount(hasInbox)
+
+  const table = (
+    <>
+      {admin && tab === 'all' && (
+        <div className="filters">
+          <Select
+            allowClear
+            placeholder="Любой статус"
+            value={filters.status || undefined}
+            options={releaseStatusOptions}
+            onChange={(v?: string) => url.set({ status: v ?? null })}
+            style={{ width: 240 }}
+          />
+          <DepartmentSelect
+            value={Number(filters.department_id) || undefined}
+            onChange={(id) => url.set({ department_id: id ?? null })}
+            placeholder="Любой отдел подписки"
+            style={{ width: 240 }}
+          />
+          <UserSelect
+            allowClear
+            includeBlocked
+            value={Number(filters.requester_id) || undefined}
+            onChange={(id) => url.set({ requester_id: id ?? null })}
+            placeholder="Любой сотрудник"
+            style={{ width: 280 }}
+          />
+        </div>
+      )}
+      <Card variant="borderless" styles={{ body: { padding: 0 } }}>
+        <ReleasesTable
+          items={releases.data?.items}
+          loading={releases.isFetching}
+          withDepartment={admin}
+          emptyText={
+            tab === 'inbox'
+              ? 'Новых заявок на отказ нет'
+              : filtered
+                ? 'Ничего не нашли'
+                : 'Заявок на отказ пока нет'
+          }
+          pagination={url.pagination(releases.data?.total)}
+        />
+      </Card>
+    </>
+  )
+
+  return (
+    <>
+      {releases.error && (
+        <Alert type="error" showIcon title={errorText(releases.error)} style={{ marginBottom: 24 }} />
+      )}
+      {hasInbox ? (
+        <Tabs
+          activeKey={tab}
+          onChange={(key) => url.set({ tab: key === 'all' ? 'all' : null, ...noFilters })}
+          items={[
+            {
+              key: 'inbox',
+              label: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {admin ? 'Ждут меня' : 'Входящие'} <Badge count={inbox.data ?? 0} size="small" />
+                </span>
+              ),
+              children: (
+                <>
+                  {admin && (
+                    <Alert
+                      type="info"
+                      showIcon
+                      title="Здесь — отказы, которые решить больше некому: подписка общая или в её отделе нет начальника. Остальные решают начальники отделов, но закрыть любую можно во вкладке «Все»"
+                      style={{ marginBottom: 16 }}
+                    />
+                  )}
                   {table}
                 </>
               ),

@@ -1,17 +1,20 @@
 import { PlusOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Card, Empty, Popconfirm, Spin } from 'antd'
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useAssignments, useRevokeAssignment } from '../api/assignments'
 import { useSubscriptions } from '../api/subscriptions'
 import type { AssignmentDTO, SubscriptionDTO } from '../api/types'
 import { useMe } from '../auth/AuthContext'
+import { CancelReleaseButton } from '../components/CancelReleaseButton'
 import { NewRequestModal } from '../components/NewRequestModal'
 import { PageHeader } from '../components/PageHeader'
+import { ReleaseRequestModal } from '../components/ReleaseRequestModal'
 import { ServiceTile } from '../components/ServiceTile'
-import { SubscriptionStatusBadge } from '../components/StatusBadge'
+import { StatusBadge, SubscriptionStatusBadge } from '../components/StatusBadge'
 import { errorText } from '../lib/errors'
 import { daysLeft, formatDate, formatDay, plural } from '../lib/format'
+import { managesDepartment } from '../lib/permissions'
 
 // The server caps a page at 200; nobody holds that many licences.
 const ALL = { limit: 200 }
@@ -84,15 +87,8 @@ function SubscriptionCard({
   assignment: AssignmentDTO
   subscription: SubscriptionDTO | undefined
 }) {
-  const { message } = App.useApp()
-  const revoke = useRevokeAssignment()
+  const me = useMe()
   const expiring = sub?.status === 'expiring_soon'
-
-  const onRevoke = () =>
-    revoke.mutateAsync(assignment.id).then(
-      () => message.success(`Вы отказались от «${assignment.subscription_name}»`),
-      (err: unknown) => message.error(errorText(err)),
-    )
 
   return (
     <Card variant="borderless" className={`sub-card${expiring ? ' sub-card-expiring' : ''}`}>
@@ -119,20 +115,72 @@ function SubscriptionCard({
         </div>
       </dl>
       <div className="sub-card-actions">
-        <Popconfirm
-          title="Отказаться от подписки?"
-          description="Лицензия освободится для коллег. Вернуть её можно только новой заявкой."
-          okText="Отказаться"
-          cancelText="Оставить"
-          okButtonProps={{ danger: true }}
-          onConfirm={onRevoke}
-        >
-          <Button danger loading={revoke.isPending}>
-            Отказаться
-          </Button>
-        </Popconfirm>
+        {managesDepartment(me, assignment.subscription_department_id) ? (
+          <GiveBackNow assignment={assignment} />
+        ) : assignment.release_request_id !== null ? (
+          <>
+            <StatusBadge tone="warning">
+              <Link to={`/release-requests/${assignment.release_request_id}`} style={{ color: 'inherit' }}>
+                Ждёт решения об отказе
+              </Link>
+            </StatusBadge>
+            <CancelReleaseButton id={assignment.release_request_id} label="Отозвать заявку" />
+          </>
+        ) : (
+          <AskToGiveBack assignment={assignment} departmentName={sub?.department_name} />
+        )}
       </div>
     </Card>
+  )
+}
+
+// GiveBackNow: a manager's licence of their own department's subscription —
+// they manage it, so it is revoked at once, without a request.
+function GiveBackNow({ assignment }: { assignment: AssignmentDTO }) {
+  const { message } = App.useApp()
+  const revoke = useRevokeAssignment()
+  return (
+    <Popconfirm
+      title="Отказаться от подписки?"
+      description="Подписка вашего отдела: лицензия освободится сразу. Вернуть её можно, выдав заново."
+      okText="Отказаться"
+      cancelText="Оставить"
+      okButtonProps={{ danger: true }}
+      onConfirm={() =>
+        revoke.mutateAsync(assignment.id).then(
+          () => message.success(`Вы отказались от «${assignment.subscription_name}»`),
+          (err: unknown) => message.error(errorText(err)),
+        )
+      }
+    >
+      <Button danger loading={revoke.isPending}>
+        Отказаться
+      </Button>
+    </Popconfirm>
+  )
+}
+
+// AskToGiveBack: anybody else asks whoever manages the subscription.
+function AskToGiveBack({
+  assignment,
+  departmentName,
+}: {
+  assignment: AssignmentDTO
+  departmentName: string | null | undefined
+}) {
+  const [asking, setAsking] = useState(false)
+  return (
+    <>
+      <Button danger onClick={() => setAsking(true)}>
+        Отказаться…
+      </Button>
+      <ReleaseRequestModal
+        assignment={assignment}
+        departmentName={departmentName}
+        open={asking}
+        onClose={() => setAsking(false)}
+      />
+    </>
   )
 }
 

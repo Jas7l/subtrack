@@ -28,9 +28,19 @@ export function useUser(id: number) {
 
 // A user change moves department heads and head counts; blocking also
 // revokes every licence (seats, analytics) and cancels the user's pending
-// requests. The admin may edit themselves.
+// requests and release requests. A role or department change moves who
+// decides release requests. The admin may edit themselves.
 function afterChange(queryClient: QueryClient) {
-  const keys = ['users', 'departments', 'assignments', 'subscriptions', 'requests', 'analytics', 'auth']
+  const keys = [
+    'users',
+    'departments',
+    'assignments',
+    'subscriptions',
+    'requests',
+    'releases',
+    'analytics',
+    'auth',
+  ]
   for (const key of keys) {
     void queryClient.invalidateQueries({ queryKey: [key] })
   }

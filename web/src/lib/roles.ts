@@ -5,7 +5,8 @@ import type { Role } from '../api/types'
 export interface NavLeaf {
   path: string
   label: string
-  // Shows the count of requests waiting for the caller's decision.
+  // Shows the count of requests waiting for the caller's decision, for a
+  // subscription and to give a licence back.
   requestsBadge?: boolean
 }
 

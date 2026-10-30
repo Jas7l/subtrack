@@ -18,10 +18,12 @@ export function useAssignments(query: Query = {}, enabled = true) {
 }
 
 // A licence changes the seats of its subscription and the department's
-// numbers (seats used, utilisation).
+// numbers (seats used, utilisation); a revoke also closes the holder's
+// release request that waited.
 function afterChange(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: ['assignments'] })
   void queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
+  void queryClient.invalidateQueries({ queryKey: ['releases'] })
   void queryClient.invalidateQueries({ queryKey: ['analytics'] })
 }
 
