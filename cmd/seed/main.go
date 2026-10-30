@@ -1,7 +1,8 @@
 // Command seed fills an empty SubTrack database with demo data through the
 // HTTP API, the same way a client would: it signs in as the bootstrap admin,
 // creates currencies, departments, users, subscriptions, licences and past
-// payments, then plays a few software requests through the approval chain.
+// payments, then plays a few software requests through the approval chain
+// and a few requests to give a licence back.
 //
 // Run it once against a freshly started server:
 //
@@ -241,10 +242,11 @@ var subscriptions = []subSeed{
 		cost: "54.99", currency: "USD", period: "month", dept: "Дизайн", start: monthsAgo(4, 3),
 		holders: []string{"volkova@company.ru"}},
 
-	// 3 of 10 seats: unused_seats.
+	// 4 of 10 seats: unused_seats. A designer holds one of the marketing
+	// seats: their request to give it back goes to marketing's head.
 	{name: "Miro Business", vendor: "Miro", category: "Совместная работа", typ: "group",
 		cost: "160.00", currency: "USD", period: "month", dept: "Маркетинг", seats: 10, start: monthsAgo(9, 10),
-		holders: []string{"lebedev@company.ru", "kozlova@company.ru", "egorov@company.ru"}},
+		holders: []string{"lebedev@company.ru", "kozlova@company.ru", "egorov@company.ru", "morozov@company.ru"}},
 	// Nobody uses it: no_holders.
 	{name: "Zoom Pro", vendor: "Zoom", category: "Коммуникации", typ: "group",
 		cost: "41.98", currency: "EUR", period: "month", dept: "Маркетинг", seats: 3, start: monthsAgo(3, 7)},
@@ -493,11 +495,55 @@ func main() {
 		"justification":  "Работа с базами данных, отдельная лицензия для аналитика",
 		"estimated_cost": "229.00", "currency": "USD"})
 
+	log.Println("release requests")
+	// licence is the id of the active licence of subscription sub that
+	// email holds, as they see it.
+	licence := func(email, sub string) int64 {
+		var page struct {
+			Items []struct {
+				ID int64 `json:"id"`
+			} `json:"items"`
+		}
+		sess(email).call(http.MethodGet, fmt.Sprintf("/assignments?subscription_id=%d&user_id=%d&status=active",
+			subIDs[sub], userIDs[email]), nil, &page)
+		if len(page.Items) != 1 {
+			log.Fatalf("%s holds no licence of %s", email, sub)
+		}
+		return page.Items[0].ID
+	}
+	giveBack := func(email, sub, reason string) int64 {
+		return sess(email).create("/release-requests", map[string]any{"assignment_id": licence(email, sub), "reason": reason})
+	}
+	decideRelease := func(who session, id int64, verdict string, body map[string]any) {
+		who.call(http.MethodPost, fmt.Sprintf("/release-requests/%d/%s", id, verdict), body, nil)
+	}
+
+	// Company-wide: the admin approves; Slack keeps fewer than 10 people
+	// (enterprise_low_usage).
+	r = giveBack("kuznetsova@company.ru", "Slack Business+", "Переписываемся в Яндекс Мессенджере, Slack не открываю")
+	decideRelease(admin, r, "approve", map[string]any{"comment": "Освободили место"})
+	// Rejected by the head of the subscription's department.
+	r = giveBack("vasiliev@company.ru", "Confluence", "Документацию смотрю в репозитории")
+	decideRelease(sess("ivanov@company.ru"), r, "reject",
+		map[string]any{"comment": "В Confluence ведём релизные заметки, лицензия понадобится к концу месяца"})
+	// Cancelled by the requester.
+	r = giveBack("volkova@company.ru", "Figma Professional", "")
+	sess("volkova@company.ru").call(http.MethodPost, fmt.Sprintf("/release-requests/%d/cancel", r), nil, nil)
+	// Left pending: for the head of development; for marketing's head (a
+	// designer's licence of a marketing subscription); for the admin - a
+	// department without a head, and a company-wide subscription.
+	giveBack("popov@company.ru", "JetBrains All Products Pack", "Перешёл на VS Code, лицензия свободна для новичка")
+	giveBack("morozov@company.ru", "Miro Business", "Доски для дизайна ведём в Figma")
+	giveBack("semenov@company.ru", "1С:Бухгалтерия ПРОФ", "Отчётность теперь ведёт Павлова Т. В.")
+	giveBack("smirnov@company.ru", "Slack Business+", "")
+	// Blocking the requester cancels the request.
+	giveBack("zaitsev@company.ru", "amoCRM Профессиональный", "Ухожу из компании")
+
 	for _, email := range blocked {
 		admin.call(http.MethodPatch, fmt.Sprintf("/users/%d", userIDs[email]), map[string]any{"is_active": false}, nil)
 	}
 
-	log.Printf("done: %d departments, %d users, %d subscriptions, %d payments, 9 requests",
+	log.Printf("done: %d departments, %d users, %d subscriptions, %d payments, 9 requests, 8 release requests",
 		len(departments), len(users), len(subscriptions)+2, payments)
 	log.Printf("every demo user signs in with password %q, e.g. ivanov@company.ru (manager), smirnov@company.ru (employee)", *userPassword)
 }

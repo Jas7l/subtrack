@@ -49,6 +49,24 @@ func (s *Store) SendToAdmins(ctx context.Context, n domain.Notification) error {
 	return pg.Translate(ctx, "send notification to admins", err)
 }
 
+// SendToManagers stores a copy of n for every active manager of department
+// deptID and returns how many were stored (0 when it has none); n.UserID is
+// ignored.
+//
+// Errors:
+//   - any db error wrapped as "postgres: send notification to managers: ...".
+func (s *Store) SendToManagers(ctx context.Context, deptID int64, n domain.Notification) (int64, error) {
+	tag, err := pg.Conn(ctx, s.pool).Exec(ctx, `
+		INSERT INTO subtrack.notifications (user_id, type, title, body, entity_type, entity_id)
+		SELECT id, $2, $3, $4, NULLIF($5, ''), NULLIF($6, 0) FROM subtrack.users
+		WHERE role = 'manager' AND is_active AND department_id = $1`,
+		deptID, string(n.Type), n.Title, n.Body, string(n.EntityType), entityID(n))
+	if err != nil {
+		return 0, pg.Translate(ctx, "send notification to managers", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
 // entityID is n.EntityID, or 0 (stored as NULL) when n points nowhere, so
 // the two columns are always set together.
 func entityID(n domain.Notification) int64 {

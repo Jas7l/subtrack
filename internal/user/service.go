@@ -234,8 +234,9 @@ func (s *Service) Create(ctx context.Context, actor domain.User, in CreateUserIn
 // Side effects, done by the store in the same transaction: if the user headed
 // a department and is no longer an active manager in it (blocked, demoted or
 // moved), that department is left without a head; if the user is blocked,
-// all their licences are revoked by actor and their pending requests are
-// cancelled (the audit record counts both).
+// all their licences are revoked by actor and their pending requests (for a
+// subscription and to give a licence back) are cancelled (the audit record
+// counts each).
 //
 // Errors:
 //   - apperr.ErrInvalidInput for an empty patch or an invalid value.
@@ -291,6 +292,7 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 		if blocking {
 			details["licences_revoked"] = undone.LicencesRevoked
 			details["requests_cancelled"] = undone.RequestsCancelled
+			details["release_requests_cancelled"] = undone.ReleasesCancelled
 		}
 		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "user.update", "user", id, details))
 	})
@@ -298,7 +300,8 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 		return domain.User{}, mapWriteErr(err)
 	}
 	if blocking {
-		log.Info("user blocked", "id", id, "licences_revoked", undone.LicencesRevoked, "requests_cancelled", undone.RequestsCancelled)
+		log.Info("user blocked", "id", id, "licences_revoked", undone.LicencesRevoked,
+			"requests_cancelled", undone.RequestsCancelled, "release_requests_cancelled", undone.ReleasesCancelled)
 	}
 	log.Info("user updated", "id", u.ID, "fields", p.Fields())
 	return u, nil

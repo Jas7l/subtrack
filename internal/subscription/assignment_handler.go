@@ -12,35 +12,42 @@ import (
 )
 
 // AssignmentDTO is a licence as the client sees it.
+// subscription_department_id is the subscription's department (null:
+// company-wide); release_request_id is the holder's request to give the
+// licence back that still waits, null when there is none.
 type AssignmentDTO struct {
-	ID               int64      `json:"id" example:"40"`
-	SubscriptionID   int64      `json:"subscription_id" example:"12"`
-	SubscriptionName string     `json:"subscription_name" example:"Jira"`
-	UserID           int64      `json:"user_id" example:"7"`
-	UserName         string     `json:"user_name" example:"Петров Пётр Петрович"`
-	Status           string     `json:"status" example:"active" enums:"active,revoked"`
-	AssignedBy       *int64     `json:"assigned_by" example:"1"`
-	AssignedByName   *string    `json:"assigned_by_name" example:"Администратор"`
-	AssignedAt       time.Time  `json:"assigned_at" example:"2026-10-23T10:00:00Z"`
-	RevokedBy        *int64     `json:"revoked_by" example:"1"`
-	RevokedByName    *string    `json:"revoked_by_name" example:"Иванов Иван Сергеевич"`
-	RevokedAt        *time.Time `json:"revoked_at" example:"2026-11-02T09:30:00Z"`
+	ID                       int64      `json:"id" example:"40"`
+	SubscriptionID           int64      `json:"subscription_id" example:"12"`
+	SubscriptionName         string     `json:"subscription_name" example:"Jira"`
+	SubscriptionDepartmentID *int64     `json:"subscription_department_id" example:"1"`
+	UserID                   int64      `json:"user_id" example:"7"`
+	UserName                 string     `json:"user_name" example:"Петров Пётр Петрович"`
+	Status                   string     `json:"status" example:"active" enums:"active,revoked"`
+	AssignedBy               *int64     `json:"assigned_by" example:"1"`
+	AssignedByName           *string    `json:"assigned_by_name" example:"Администратор"`
+	AssignedAt               time.Time  `json:"assigned_at" example:"2026-10-23T10:00:00Z"`
+	RevokedBy                *int64     `json:"revoked_by" example:"1"`
+	RevokedByName            *string    `json:"revoked_by_name" example:"Иванов Иван Сергеевич"`
+	RevokedAt                *time.Time `json:"revoked_at" example:"2026-11-02T09:30:00Z"`
+	ReleaseRequestID         *int64     `json:"release_request_id" example:"5"`
 }
 
 func toAssignmentDTO(a domain.Assignment) AssignmentDTO {
 	return AssignmentDTO{
-		ID:               a.ID,
-		SubscriptionID:   a.SubscriptionID,
-		SubscriptionName: a.SubscriptionName,
-		UserID:           a.UserID,
-		UserName:         a.UserName,
-		Status:           string(a.Status),
-		AssignedBy:       a.AssignedBy,
-		AssignedByName:   a.AssignedByName,
-		AssignedAt:       a.AssignedAt,
-		RevokedBy:        a.RevokedBy,
-		RevokedByName:    a.RevokedByName,
-		RevokedAt:        a.RevokedAt,
+		ID:                       a.ID,
+		SubscriptionID:           a.SubscriptionID,
+		SubscriptionName:         a.SubscriptionName,
+		SubscriptionDepartmentID: a.SubscriptionDepartmentID,
+		UserID:                   a.UserID,
+		UserName:                 a.UserName,
+		Status:                   string(a.Status),
+		AssignedBy:               a.AssignedBy,
+		AssignedByName:           a.AssignedByName,
+		AssignedAt:               a.AssignedAt,
+		RevokedBy:                a.RevokedBy,
+		RevokedByName:            a.RevokedByName,
+		RevokedAt:                a.RevokedAt,
+		ReleaseRequestID:         a.ReleaseRequestID,
 	}
 }
 
@@ -180,7 +187,7 @@ func (h *handler) assign(w http.ResponseWriter, r *http.Request) {
 // revoke godoc
 //
 //	@Summary		Revoke a licence
-//	@Description	Frees the seat; the row stays as history. Allowed to the admin, the manager of the subscription's department, and the holder (giving it back).
+//	@Description	Frees the seat; the row stays as history. Allowed to whoever manages the subscription: the admin and a manager of its department (their own licence included). Any other holder gets a 403 and files a release request instead. A release request of the holder that waits is closed as approved.
 //	@Tags			assignments
 //	@Produce		json
 //	@Security		BearerAuth
@@ -188,6 +195,7 @@ func (h *handler) assign(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{object}	AssignmentDTO
 //	@Failure		400	{object}	httpx.ErrorBody
 //	@Failure		401	{object}	httpx.ErrorBody
+//	@Failure		403	{object}	httpx.ErrorBody
 //	@Failure		404	{object}	httpx.ErrorBody
 //	@Failure		409	{object}	httpx.ErrorBody
 //	@Failure		500	{object}	httpx.ErrorBody

@@ -748,7 +748,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Frees the seat; the row stays as history. Allowed to the admin, the manager of the subscription's department, and the holder (giving it back).",
+                "description": "Frees the seat; the row stays as history. Allowed to whoever manages the subscription: the admin and a manager of its department (their own licence included). Any other holder gets a 403 and files a release request instead. A release request of the holder that waits is closed as approved.",
                 "produces": [
                     "application/json"
                 ],
@@ -780,6 +780,12 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorBody"
                         }
@@ -834,6 +840,7 @@
                             "subscription",
                             "assignment",
                             "request",
+                            "release_request",
                             "transaction",
                             "settings",
                             "currency"
@@ -1815,6 +1822,464 @@
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/release-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Requests to give a licence back. Admin: all. Manager: those about their department's subscriptions plus their own. Employee: their own. Newest first. inbox=true keeps the pending ones waiting for the caller: a manager's department's; for the admin only those nobody else can decide (a company-wide subscription, a department without an active manager).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "release-requests"
+                ],
+                "summary": "List release requests",
+                "parameters": [
+                    {
+                        "enum": [
+                            "pending",
+                            "approved",
+                            "rejected",
+                            "cancelled"
+                        ],
+                        "type": "string",
+                        "description": "Only this status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this requester's",
+                        "name": "requester_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only about this subscription",
+                        "name": "subscription_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only about subscriptions of this department",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only the pending ones waiting for the caller",
+                        "name": "inbox",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ListReleaseRequestsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Only the holder, only for an active licence of a subscription they do not manage (otherwise 409: revoke it yourself), one waiting request per licence. Whoever manages the subscription decides: a manager of its department, or the admin; they are notified (the admins when the subscription is company-wide or its department has no active manager). reason is optional.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "release-requests"
+                ],
+                "summary": "Ask to give a licence back (employee, manager)",
+                "parameters": [
+                    {
+                        "description": "Which licence and why",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/subscription.CreateReleaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ReleaseRequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/release-requests/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Visible as in the list; anything else is a 404.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "release-requests"
+                ],
+                "summary": "Get a release request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Release request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ReleaseRequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/release-requests/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "A manager of the subscription's department or the admin. Revokes the licence in the same transaction. The comment is optional.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "release-requests"
+                ],
+                "summary": "Approve a release request (manager, admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Release request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Comment (may be empty: {})",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ApproveReleaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ReleaseRequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/release-requests/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Only the requester, only while the request is pending. The licence stays.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "release-requests"
+                ],
+                "summary": "Cancel own release request",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Release request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ReleaseRequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    }
+                }
+            }
+        },
+        "/release-requests/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "A manager of the subscription's department or the admin. The licence stays with its holder. A comment is required.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "release-requests"
+                ],
+                "summary": "Reject a release request (manager, admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Release request id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Why",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/subscription.RejectReleaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/subscription.ReleaseRequestDTO"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorBody"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorBody"
                         }
@@ -4403,7 +4868,8 @@
                     "enum": [
                         "request",
                         "subscription",
-                        "transaction"
+                        "transaction",
+                        "release_request"
                     ],
                     "example": "request"
                 },
@@ -4427,7 +4893,10 @@
                         "payment_due",
                         "request_created",
                         "request_approved",
-                        "request_rejected"
+                        "request_rejected",
+                        "release_created",
+                        "release_approved",
+                        "release_rejected"
                     ],
                     "example": "request_approved"
                 }
@@ -4708,6 +5177,15 @@
                 }
             }
         },
+        "subscription.ApproveReleaseRequest": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "type": "string",
+                    "example": "Место отдадим новому сотруднику"
+                }
+            }
+        },
         "subscription.AssignRequest": {
             "type": "object",
             "properties": {
@@ -4740,6 +5218,10 @@
                     "type": "integer",
                     "example": 40
                 },
+                "release_request_id": {
+                    "type": "integer",
+                    "example": 5
+                },
                 "revoked_at": {
                     "type": "string",
                     "example": "2026-11-02T09:30:00Z"
@@ -4760,6 +5242,10 @@
                     ],
                     "example": "active"
                 },
+                "subscription_department_id": {
+                    "type": "integer",
+                    "example": 1
+                },
                 "subscription_id": {
                     "type": "integer",
                     "example": 12
@@ -4775,6 +5261,19 @@
                 "user_name": {
                     "type": "string",
                     "example": "Петров Пётр Петрович"
+                }
+            }
+        },
+        "subscription.CreateReleaseRequest": {
+            "type": "object",
+            "properties": {
+                "assignment_id": {
+                    "type": "integer",
+                    "example": 40
+                },
+                "reason": {
+                    "type": "string",
+                    "example": "Перешёл в отдел тестирования, Jira больше не нужна"
                 }
             }
         },
@@ -4867,6 +5366,29 @@
                 }
             }
         },
+        "subscription.ListReleaseRequestsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/subscription.ReleaseRequestDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 123
+                }
+            }
+        },
         "subscription.ListSubscriptionsResponse": {
             "type": "object",
             "properties": {
@@ -4887,6 +5409,90 @@
                 "total": {
                     "type": "integer",
                     "example": 123
+                }
+            }
+        },
+        "subscription.RejectReleaseRequest": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "type": "string",
+                    "example": "Jira нужна для отчётов по задачам до конца квартала"
+                }
+            }
+        },
+        "subscription.ReleaseRequestDTO": {
+            "type": "object",
+            "properties": {
+                "assignment_id": {
+                    "type": "integer",
+                    "example": 40
+                },
+                "comment": {
+                    "type": "string",
+                    "example": ""
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-10-30T10:00:00Z"
+                },
+                "decided_at": {
+                    "type": "string",
+                    "example": "2026-10-30T12:00:00Z"
+                },
+                "decided_by": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "decided_by_name": {
+                    "type": "string",
+                    "example": "Иванов Иван Сергеевич"
+                },
+                "department_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "department_name": {
+                    "type": "string",
+                    "example": "Разработка"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "reason": {
+                    "type": "string",
+                    "example": "Перешёл в отдел тестирования, Jira больше не нужна"
+                },
+                "requester_id": {
+                    "type": "integer",
+                    "example": 7
+                },
+                "requester_name": {
+                    "type": "string",
+                    "example": "Смирнов Алексей Петрович"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "approved",
+                        "rejected",
+                        "cancelled"
+                    ],
+                    "example": "pending"
+                },
+                "subscription_id": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "subscription_name": {
+                    "type": "string",
+                    "example": "Jira"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-10-30T12:00:00Z"
                 }
             }
         },

@@ -12,15 +12,20 @@ import (
 	"subtrack/internal/storage"
 )
 
-// Store reads and writes subtrack.subscriptions and
-// subtrack.subscription_assignments. The pool is borrowed, not owned. Every
-// method runs on pg.Conn(ctx, pool), so it joins a transaction started by
-// pg.TxRunner (its own transactions become savepoints).
+// Store reads and writes subtrack.subscriptions,
+// subtrack.subscription_assignments and subtrack.release_requests. The pool
+// is borrowed, not owned. Every method runs on pg.Conn(ctx, pool), so it
+// joins a transaction started by pg.TxRunner (its own transactions become
+// savepoints).
 //
 // Lock order. Every write that touches more than one of these rows takes the
-// locks in the same order - user, then subscription, then assignments - so
-// two concurrent writes wait for each other instead of deadlocking. The user
-// store follows it too when blocking a user revokes their licences.
+// locks in the same order - user, then subscription, then its assignments
+// and release requests - so two concurrent writes wait for each other
+// instead of deadlocking. The user store follows it too when blocking a user
+// revokes their licences. Whatever changes an assignment's status or a
+// release request together with a licence holds the subscription row first:
+// FOR UPDATE to revoke or decide, FOR SHARE to file a request; so those
+// writes on one subscription never interleave.
 type Store struct {
 	pool *pgxpool.Pool
 }

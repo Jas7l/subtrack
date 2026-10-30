@@ -3,11 +3,12 @@
 //
 // Who does what:
 //   - the admin creates, edits, cancels and deletes subscriptions and hands
-//     out licences of any of them to any active user;
-//   - a manager sees their department's subscriptions and hands out their
-//     licences to the people of their department;
-//   - everybody sees the subscriptions they hold a licence for and may give a
-//     licence back.
+//     out and revokes licences of any of them to any active user;
+//   - a manager sees their department's subscriptions, hands out their
+//     licences to the people of their department and revokes them;
+//   - everybody sees the subscriptions they hold a licence for. To give a
+//     licence back its holder files a release request, unless they manage
+//     the subscription themselves (then they just revoke it).
 //
 // Anything outside the caller's view is a 404, as everywhere else.
 //
@@ -16,6 +17,11 @@
 // with assignments; the database refuses more licences than seats, and an
 // edit that would leave seats_total below seats_used. Cancelling or deleting a
 // subscription revokes all its licences in the same transaction.
+//
+// Release requests (release_*.go): one decision, by whoever manages the
+// subscription - a manager of its department or the admin, whoever is first.
+// A licence revoked another way while its request waits closes the request
+// as approved by whoever revoked it, in the same transaction.
 package subscription
 
 import (
@@ -67,6 +73,14 @@ type repo interface {
 	ListAssignments(ctx context.Context, f domain.AssignmentFilter, sc *domain.SubscriptionScope, limit, offset int) ([]domain.Assignment, int64, error)
 	Assign(ctx context.Context, subID, userID, actorID int64) (domain.Assignment, error)
 	Revoke(ctx context.Context, id, actorID int64) (domain.Assignment, error)
+
+	GetRelease(ctx context.Context, id int64) (domain.ReleaseRequest, error)
+	LockRelease(ctx context.Context, id int64) (domain.ReleaseRequest, error)
+	ListReleases(ctx context.Context, f domain.ReleaseFilter, sc *domain.SubscriptionScope, limit, offset int) ([]domain.ReleaseRequest, int64, error)
+	CreateRelease(ctx context.Context, r domain.ReleaseRequest) (domain.ReleaseRequest, error)
+	DecideRelease(ctx context.Context, id int64, d domain.ReleaseDecision) (domain.ReleaseRequest, error)
+	CancelRelease(ctx context.Context, id, requesterID int64) (domain.ReleaseRequest, error)
+	CloseReleases(ctx context.Context, subID, actorID int64) ([]domain.ReleaseRequest, error)
 }
 
 // users is what the service needs to vet an assignee; *user.Store satisfies
@@ -92,25 +106,35 @@ type auditor interface {
 	Record(ctx context.Context, e domain.AuditEntry) error
 }
 
-// Service implements the subscriptions and assignments use cases. Every
-// write runs in a transaction together with its audit record; called inside
-// another domain's transaction (an approved request), it joins it.
+// notifier stores in-app notifications; *notification.Store satisfies it.
+// It is called inside the change's transaction.
+type notifier interface {
+	Send(ctx context.Context, n domain.Notification) error
+	SendToAdmins(ctx context.Context, n domain.Notification) error
+	SendToManagers(ctx context.Context, deptID int64, n domain.Notification) (int64, error)
+}
+
+// Service implements the subscriptions, assignments and release requests
+// use cases. Every write runs in a transaction together with its audit
+// record (and notifications); called inside another domain's transaction
+// (an approved request), it joins it.
 type Service struct {
-	repo  repo
-	users users
-	depts departments
-	tx    transactor
-	audit auditor
-	loc   *time.Location
+	repo   repo
+	users  users
+	depts  departments
+	tx     transactor
+	audit  auditor
+	notify notifier
+	loc    *time.Location
 	// now is time.Now; tests replace it.
 	now func() time.Time
 }
 
 // New wires a Service over its repo, the users and departments readers, the
-// transaction runner and the audit trail. loc decides what "today" is (the
-// company's zone, the scheduler's).
-func New(r repo, u users, d departments, tx transactor, a auditor, loc *time.Location) *Service {
-	return &Service{repo: r, users: u, depts: d, tx: tx, audit: a, loc: loc, now: time.Now}
+// transaction runner, the audit trail and the notifications. loc decides
+// what "today" is (the company's zone, the scheduler's).
+func New(r repo, u users, d departments, tx transactor, a auditor, n notifier, loc *time.Location) *Service {
+	return &Service{repo: r, users: u, depts: d, tx: tx, audit: a, notify: n, loc: loc, now: time.Now}
 }
 
 // today is the calendar day in the company's zone, as midnight UTC.
@@ -248,7 +272,8 @@ func (s *Service) Create(ctx context.Context, actor domain.User, sub domain.Subs
 
 // Update applies a partial patch on behalf of actor (an admin). People may
 // set the status to active or cancelled only; expiring_soon and expired are
-// the scheduler's. Cancelling revokes every licence in the same transaction.
+// the scheduler's. Cancelling revokes every licence in the same transaction
+// and closes the release requests that waited as approved.
 // Bringing a cancelled or expired subscription back to active moves a past
 // next_payment_date forward to today or later (see reopen). Changing the type without
 // seats_total resets the seats to the new type's default (1 for individual,
@@ -308,6 +333,13 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 		}
 		if cur.Status != domain.SubCancelled && out.Status == domain.SubCancelled {
 			details["licences_revoked"] = cur.SeatsUsed
+			closed, err := s.closeReleases(ctx, actor, id)
+			if err != nil {
+				return err
+			}
+			if closed > 0 {
+				details["release_requests_closed"] = closed
+			}
 		}
 		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "subscription.update", "subscription", id, details))
 	})
@@ -322,7 +354,7 @@ func (s *Service) Update(ctx context.Context, actor domain.User, id int64, p dom
 }
 
 // Delete soft-deletes a subscription and revokes its licences on behalf of
-// actor (an admin).
+// actor (an admin); release requests that waited are closed as approved.
 //
 // Errors:
 //   - ErrSubscriptionNotFound when no live subscription has that id.
@@ -338,8 +370,15 @@ func (s *Service) Delete(ctx context.Context, actor domain.User, id int64) error
 		if err := s.repo.Delete(ctx, id, actor.ID); err != nil {
 			return err
 		}
-		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "subscription.delete", "subscription", id,
-			map[string]any{"name": cur.Name, "licences_revoked": cur.SeatsUsed}))
+		details := map[string]any{"name": cur.Name, "licences_revoked": cur.SeatsUsed}
+		closed, err := s.closeReleases(ctx, actor, id)
+		if err != nil {
+			return err
+		}
+		if closed > 0 {
+			details["release_requests_closed"] = closed
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "subscription.delete", "subscription", id, details))
 	})
 	if err != nil {
 		return apperr.MapStorage(err, ErrSubscriptionNotFound)

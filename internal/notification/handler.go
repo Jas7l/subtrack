@@ -20,13 +20,13 @@ type handler struct {
 // NotificationDTO is a notification as the client sees it.
 type NotificationDTO struct {
 	ID    int64  `json:"id" example:"88"`
-	Type  string `json:"type" example:"request_approved" enums:"subscription_expiring,subscription_expired,payment_due,request_created,request_approved,request_rejected"`
+	Type  string `json:"type" example:"request_approved" enums:"subscription_expiring,subscription_expired,payment_due,request_created,request_approved,request_rejected,release_created,release_approved,release_rejected"`
 	Title string `json:"title" example:"Заявка одобрена: Figma"`
 	Body  string `json:"body" example:"Вам выдана лицензия Figma."`
 	// EntityType and EntityID name the record the notification is about;
 	// both are null when it points nowhere (notifications stored before
 	// migration 0011).
-	EntityType *string   `json:"entity_type" example:"request" enums:"request,subscription,transaction"`
+	EntityType *string   `json:"entity_type" example:"request" enums:"request,subscription,transaction,release_request"`
 	EntityID   *int64    `json:"entity_id" example:"12"`
 	IsRead     bool      `json:"is_read" example:"false"`
 	CreatedAt  time.Time `json:"created_at" example:"2026-10-23T10:00:00Z"`

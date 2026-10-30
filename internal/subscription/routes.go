@@ -13,14 +13,17 @@ import (
 	"subtrack/internal/httpx"
 )
 
-// RegisterRoutes mounts /subscriptions and /assignments on the protected
-// router (already behind auth.Middleware). Subscription writes are
-// admin-only; handing out licences is for the admin and managers; reads and
-// revoking are open to everyone and scoped by the service.
+// RegisterRoutes mounts /subscriptions, /assignments and /release-requests
+// on the protected router (already behind auth.Middleware). Subscription
+// writes are admin-only; handing out licences and deciding release requests
+// is for the admin and managers; asking to give a licence back for employees
+// and managers (the admin revokes directly). Reads, revoking and cancelling
+// a release request are open to everyone and checked by the service.
 func RegisterRoutes(protected *mux.Router, svc *Service) {
 	h := &handler{svc: svc}
 	admin := auth.RequireRole(domain.RoleAdmin)
 	staff := auth.RequireRole(domain.RoleAdmin, domain.RoleManager)
+	holders := auth.RequireRole(domain.RoleEmployee, domain.RoleManager)
 	httpx.Register(protected, "/subscriptions", map[string]http.HandlerFunc{
 		"GET":  h.list,
 		"POST": admin(h.create),
@@ -42,6 +45,22 @@ func RegisterRoutes(protected *mux.Router, svc *Service) {
 	})
 	httpx.Register(protected, "/assignments/{id:[0-9]+}/revoke", map[string]http.HandlerFunc{
 		"POST": h.revoke,
+	})
+	httpx.Register(protected, "/release-requests", map[string]http.HandlerFunc{
+		"GET":  h.listReleases,
+		"POST": holders(h.createRelease),
+	})
+	httpx.Register(protected, "/release-requests/{id:[0-9]+}", map[string]http.HandlerFunc{
+		"GET": h.getRelease,
+	})
+	httpx.Register(protected, "/release-requests/{id:[0-9]+}/approve", map[string]http.HandlerFunc{
+		"POST": staff(h.approveRelease),
+	})
+	httpx.Register(protected, "/release-requests/{id:[0-9]+}/reject", map[string]http.HandlerFunc{
+		"POST": staff(h.rejectRelease),
+	})
+	httpx.Register(protected, "/release-requests/{id:[0-9]+}/cancel", map[string]http.HandlerFunc{
+		"POST": h.cancelRelease,
 	})
 }
 

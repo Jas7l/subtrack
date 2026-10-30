@@ -16,6 +16,13 @@ const (
 	// department head (it moves on to the admin) or the final one.
 	NotifyRequestApproved NotificationType = "request_approved"
 	NotifyRequestRejected NotificationType = "request_rejected"
+	// NotifyReleaseCreated tells whoever decides that a holder asks to give a
+	// licence back.
+	NotifyReleaseCreated NotificationType = "release_created"
+	// NotifyReleaseApproved tells the holder that the licence is revoked: by
+	// a decision on the request, or another way while it waited.
+	NotifyReleaseApproved NotificationType = "release_approved"
+	NotifyReleaseRejected NotificationType = "release_rejected"
 )
 
 // NotificationEntity is the kind of record a notification points at. The
@@ -26,6 +33,7 @@ const (
 	EntityRequest      NotificationEntity = "request"
 	EntitySubscription NotificationEntity = "subscription"
 	EntityTransaction  NotificationEntity = "transaction"
+	EntityRelease      NotificationEntity = "release_request"
 )
 
 // Notification is an in-app message to one user. EntityType and EntityID

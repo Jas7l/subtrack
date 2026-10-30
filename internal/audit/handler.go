@@ -44,7 +44,7 @@ type ListAuditResponse struct {
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			actor_id	query		int		false	"Only this user's actions"
-//	@Param			entity_type	query		string	false	"Only this entity type"	Enums(user, department, subscription, assignment, request, transaction, settings, currency)
+//	@Param			entity_type	query		string	false	"Only this entity type"	Enums(user, department, subscription, assignment, request, release_request, transaction, settings, currency)
 //	@Param			entity_id	query		int		false	"Only this entity (with entity_type)"
 //	@Param			action		query		string	false	"Only this action"
 //	@Param			from		query		string	false	"From this day (YYYY-MM-DD), inclusive"
@@ -84,7 +84,7 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 // entityTypes are the entity_type values the trail is written with.
-var entityTypes = []string{"user", "department", "subscription", "assignment", "request", "transaction", "settings", "currency"}
+var entityTypes = []string{"user", "department", "subscription", "assignment", "request", "release_request", "transaction", "settings", "currency"}
 
 // parseFilter reads the list filters. A malformed filter is a 400. The from
 // and to days are the company's days (loc), not UTC ones: an entry made at

@@ -184,6 +184,8 @@ func TestRevoke(t *testing.T) {
 	a1, _ := f.svc.Assign(ctx, f.admin, dev.ID, f.emp.ID)
 	a2, _ := f.svc.Assign(ctx, f.admin, dev.ID, f.emp2.ID)
 	a3, _ := f.svc.Assign(ctx, f.admin, dev.ID, f.out.ID)
+	own, _ := f.svc.Assign(ctx, f.mgr, dev.ID, f.mgr.ID)
+	foreign, _ := f.svc.Assign(ctx, f.admin, dev.ID, f.mgrDesign.ID)
 
 	tests := []struct {
 		name  string
@@ -193,10 +195,14 @@ func TestRevoke(t *testing.T) {
 	}{
 		{"colleague cannot", f.emp2, a1.ID, ErrAssignmentNotFound},
 		{"other department's manager cannot", f.mgrDesign, a1.ID, ErrAssignmentNotFound},
-		{"holder gives it back", f.emp, a1.ID, nil},
+		{"holder files a request instead", f.emp, a1.ID, ErrRevokeForbidden},
+		{"holder of another department's subscription too", f.mgrDesign, foreign.ID, ErrRevokeForbidden},
+		{"manager of the subscription's department", f.mgr, a1.ID, nil},
 		{"twice", f.admin, a1.ID, ErrAlreadyRevoked},
-		{"manager of the subscription's department", f.mgr, a2.ID, nil},
+		{"manager gives their own back", f.mgr, own.ID, nil},
+		{"manager of the department, any holder", f.mgr, a2.ID, nil},
 		{"admin", f.admin, a3.ID, nil},
+		{"admin, a manager's licence", f.admin, foreign.ID, nil},
 		{"missing", f.admin, 99, ErrAssignmentNotFound},
 	}
 	for _, tt := range tests {
@@ -401,7 +407,8 @@ func TestAuditTrail(t *testing.T) {
 	s := f.create(t, domain.Subscription{Name: "Jira", Type: domain.SubGroup, SeatsTotal: ptr(5), DepartmentID: ptr(int64(1))})
 	a, _ := f.svc.Assign(ctx, f.mgr, s.ID, f.emp.ID)
 	_, _ = f.svc.Assign(ctx, f.mgr, s.ID, f.emp2.ID)
-	_, _ = f.svc.Revoke(ctx, f.emp, a.ID)
+	_, _ = f.svc.Revoke(ctx, f.emp, a.ID) // refused: the holder files a request
+	_, _ = f.svc.Revoke(ctx, f.mgr, a.ID)
 	_, _ = f.svc.Update(ctx, f.admin, s.ID, domain.SubscriptionPatch{Status: ptr(domain.SubCancelled), EndDate: domain.DatePatch{Set: true}})
 	_ = f.svc.Delete(ctx, f.admin, s.ID)
 	// A refused change leaves no record.
@@ -414,7 +421,7 @@ func TestAuditTrail(t *testing.T) {
 		t.Fatalf("actions:\n got %v\nwant %v", got, want)
 	}
 	revoke := f.audit.Entries[3]
-	if *revoke.ActorID != f.emp.ID || *revoke.EntityID != a.ID || revoke.Details["user_id"] != f.emp.ID {
+	if *revoke.ActorID != f.mgr.ID || *revoke.EntityID != a.ID || revoke.Details["user_id"] != f.emp.ID {
 		t.Errorf("revoke entry: %+v", revoke)
 	}
 	cancel := f.audit.Entries[4].Details

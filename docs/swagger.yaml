@@ -536,6 +536,7 @@ definitions:
         - request
         - subscription
         - transaction
+        - release_request
         example: request
         type: string
       id:
@@ -555,6 +556,9 @@ definitions:
         - request_created
         - request_approved
         - request_rejected
+        - release_created
+        - release_approved
+        - release_rejected
         example: request_approved
         type: string
     type: object
@@ -760,6 +764,12 @@ definitions:
         example: 3
         type: integer
     type: object
+  subscription.ApproveReleaseRequest:
+    properties:
+      comment:
+        example: Место отдадим новому сотруднику
+        type: string
+    type: object
   subscription.AssignRequest:
     properties:
       subscription_id:
@@ -783,6 +793,9 @@ definitions:
       id:
         example: 40
         type: integer
+      release_request_id:
+        example: 5
+        type: integer
       revoked_at:
         example: "2026-11-02T09:30:00Z"
         type: string
@@ -798,6 +811,9 @@ definitions:
         - revoked
         example: active
         type: string
+      subscription_department_id:
+        example: 1
+        type: integer
       subscription_id:
         example: 12
         type: integer
@@ -809,6 +825,15 @@ definitions:
         type: integer
       user_name:
         example: Петров Пётр Петрович
+        type: string
+    type: object
+  subscription.CreateReleaseRequest:
+    properties:
+      assignment_id:
+        example: 40
+        type: integer
+      reason:
+        example: Перешёл в отдел тестирования, Jira больше не нужна
         type: string
     type: object
   subscription.CreateSubscriptionRequest:
@@ -877,6 +902,22 @@ definitions:
         example: 123
         type: integer
     type: object
+  subscription.ListReleaseRequestsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/subscription.ReleaseRequestDTO'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 123
+        type: integer
+    type: object
   subscription.ListSubscriptionsResponse:
     properties:
       items:
@@ -892,6 +933,68 @@ definitions:
       total:
         example: 123
         type: integer
+    type: object
+  subscription.RejectReleaseRequest:
+    properties:
+      comment:
+        example: Jira нужна для отчётов по задачам до конца квартала
+        type: string
+    type: object
+  subscription.ReleaseRequestDTO:
+    properties:
+      assignment_id:
+        example: 40
+        type: integer
+      comment:
+        example: ""
+        type: string
+      created_at:
+        example: "2026-10-30T10:00:00Z"
+        type: string
+      decided_at:
+        example: "2026-10-30T12:00:00Z"
+        type: string
+      decided_by:
+        example: 2
+        type: integer
+      decided_by_name:
+        example: Иванов Иван Сергеевич
+        type: string
+      department_id:
+        example: 1
+        type: integer
+      department_name:
+        example: Разработка
+        type: string
+      id:
+        example: 5
+        type: integer
+      reason:
+        example: Перешёл в отдел тестирования, Jira больше не нужна
+        type: string
+      requester_id:
+        example: 7
+        type: integer
+      requester_name:
+        example: Смирнов Алексей Петрович
+        type: string
+      status:
+        enum:
+        - pending
+        - approved
+        - rejected
+        - cancelled
+        example: pending
+        type: string
+      subscription_id:
+        example: 12
+        type: integer
+      subscription_name:
+        example: Jira
+        type: string
+      updated_at:
+        example: "2026-10-30T12:00:00Z"
+        type: string
     type: object
   subscription.SubscriptionDTO:
     properties:
@@ -1723,8 +1826,10 @@ paths:
       - assignments
   /assignments/{id}/revoke:
     post:
-      description: Frees the seat; the row stays as history. Allowed to the admin,
-        the manager of the subscription's department, and the holder (giving it back).
+      description: 'Frees the seat; the row stays as history. Allowed to whoever manages
+        the subscription: the admin and a manager of its department (their own licence
+        included). Any other holder gets a 403 and files a release request instead.
+        A release request of the holder that waits is closed as approved.'
       parameters:
       - description: Assignment id
         in: path
@@ -1744,6 +1849,10 @@ paths:
             $ref: '#/definitions/httpx.ErrorBody'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/httpx.ErrorBody'
         "404":
@@ -1780,6 +1889,7 @@ paths:
         - subscription
         - assignment
         - request
+        - release_request
         - transaction
         - settings
         - currency
@@ -2438,6 +2548,313 @@ paths:
       summary: Mark all my notifications read
       tags:
       - notifications
+  /release-requests:
+    get:
+      description: 'Requests to give a licence back. Admin: all. Manager: those about
+        their department''s subscriptions plus their own. Employee: their own. Newest
+        first. inbox=true keeps the pending ones waiting for the caller: a manager''s
+        department''s; for the admin only those nobody else can decide (a company-wide
+        subscription, a department without an active manager).'
+      parameters:
+      - description: Only this status
+        enum:
+        - pending
+        - approved
+        - rejected
+        - cancelled
+        in: query
+        name: status
+        type: string
+      - description: Only this requester's
+        in: query
+        name: requester_id
+        type: integer
+      - description: Only about this subscription
+        in: query
+        name: subscription_id
+        type: integer
+      - description: Only about subscriptions of this department
+        in: query
+        name: department_id
+        type: integer
+      - description: Only the pending ones waiting for the caller
+        in: query
+        name: inbox
+        type: boolean
+      - description: Page size (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.ListReleaseRequestsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: List release requests
+      tags:
+      - release-requests
+    post:
+      consumes:
+      - application/json
+      description: 'Only the holder, only for an active licence of a subscription
+        they do not manage (otherwise 409: revoke it yourself), one waiting request
+        per licence. Whoever manages the subscription decides: a manager of its department,
+        or the admin; they are notified (the admins when the subscription is company-wide
+        or its department has no active manager). reason is optional.'
+      parameters:
+      - description: Which licence and why
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.CreateReleaseRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/subscription.ReleaseRequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Ask to give a licence back (employee, manager)
+      tags:
+      - release-requests
+  /release-requests/{id}:
+    get:
+      description: Visible as in the list; anything else is a 404.
+      parameters:
+      - description: Release request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.ReleaseRequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Get a release request
+      tags:
+      - release-requests
+  /release-requests/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      description: A manager of the subscription's department or the admin. Revokes
+        the licence in the same transaction. The comment is optional.
+      parameters:
+      - description: Release request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'Comment (may be empty: {})'
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.ApproveReleaseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.ReleaseRequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Approve a release request (manager, admin)
+      tags:
+      - release-requests
+  /release-requests/{id}/cancel:
+    post:
+      description: Only the requester, only while the request is pending. The licence
+        stays.
+      parameters:
+      - description: Release request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.ReleaseRequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Cancel own release request
+      tags:
+      - release-requests
+  /release-requests/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: A manager of the subscription's department or the admin. The licence
+        stays with its holder. A comment is required.
+      parameters:
+      - description: Release request id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Why
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/subscription.RejectReleaseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/subscription.ReleaseRequestDTO'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorBody'
+      security:
+      - BearerAuth: []
+      summary: Reject a release request (manager, admin)
+      tags:
+      - release-requests
   /requests:
     get:
       description: 'Admin: all. Manager: their department''s plus their own (incoming

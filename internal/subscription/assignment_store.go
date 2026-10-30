@@ -20,23 +20,25 @@ var (
 )
 
 // selectAssignment reads an assignment with the subscription's name and
-// department, the holder's name and the names of whoever handed it out and
-// revoked it, in the order scanAssignment expects.
+// department, the holder's name, the names of whoever handed it out and
+// revoked it, and the holder's release request that still waits (at most one,
+// release_requests_pending_key), in the order scanAssignment expects.
 const selectAssignment = `
 	SELECT a.id, a.subscription_id, s.name, s.department_id, a.user_id, u.full_name,
-	       a.status, a.assigned_by, ab.full_name, a.assigned_at, a.revoked_by, rb.full_name, a.revoked_at
+	       a.status, a.assigned_by, ab.full_name, a.assigned_at, a.revoked_by, rb.full_name, a.revoked_at, rr.id
 	FROM subtrack.subscription_assignments a
 	JOIN subtrack.subscriptions s ON s.id = a.subscription_id
 	JOIN subtrack.users u ON u.id = a.user_id
 	LEFT JOIN subtrack.users ab ON ab.id = a.assigned_by
-	LEFT JOIN subtrack.users rb ON rb.id = a.revoked_by`
+	LEFT JOIN subtrack.users rb ON rb.id = a.revoked_by
+	LEFT JOIN subtrack.release_requests rr ON rr.assignment_id = a.id AND rr.status = 'pending'`
 
 func scanAssignment(row pgx.Row) (domain.Assignment, error) {
 	var a domain.Assignment
 	var status string
 	err := row.Scan(&a.ID, &a.SubscriptionID, &a.SubscriptionName, &a.SubscriptionDepartmentID,
 		&a.UserID, &a.UserName, &status, &a.AssignedBy, &a.AssignedByName, &a.AssignedAt,
-		&a.RevokedBy, &a.RevokedByName, &a.RevokedAt)
+		&a.RevokedBy, &a.RevokedByName, &a.RevokedAt, &a.ReleaseRequestID)
 	a.Status = domain.AssignmentStatus(status)
 	return a, err
 }

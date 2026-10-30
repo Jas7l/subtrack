@@ -208,13 +208,15 @@ type Assignment struct {
 	RevokedBy      *int64 // nil while active, or when revoked by the system
 	RevokedAt      *time.Time
 	// The fields below are read-only, filled in by reads: the subscription's
-	// name and owning department, the holder's name, and the names of whoever
-	// handed it out and revoked it (nil with the matching id).
+	// name and owning department, the holder's name, the names of whoever
+	// handed it out and revoked it (nil with the matching id), and the
+	// holder's request to give it back that still waits (nil when none).
 	SubscriptionName         string
 	SubscriptionDepartmentID *int64
 	UserName                 string
 	AssignedByName           *string
 	RevokedByName            *string
+	ReleaseRequestID         *int64
 }
 
 // AssignmentFilter narrows an assignment list. Zero-value fields do not

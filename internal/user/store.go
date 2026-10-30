@@ -189,29 +189,35 @@ type Undone struct {
 	LicencesRevoked int64
 	// RequestsCancelled is how many pending requests were cancelled.
 	RequestsCancelled int64
+	// ReleasesCancelled is how many pending requests to give a licence back
+	// were cancelled (their licences are revoked anyway).
+	ReleasesCancelled int64
 }
 
 // Update applies a partial patch to a user and returns the row as it stands
 // afterwards. Only the fields set in p are written; updated_at is always
 // bumped. The service rejects an empty patch before calling this.
 //
-// In the same transaction it keeps three invariants:
+// In the same transaction it keeps these invariants:
 //   - the department-head one (see domain.Department): if the user headed a
 //     department and after the update is no longer an active manager of that
 //     very department, the department is left without a head;
 //   - a blocked user holds no licences: blocking revokes every active
 //     assignment of theirs on behalf of actorID and frees the seats;
 //   - a blocked user has no pending requests: blocking cancels them, as
-//     nobody could approve them any more;
+//     nobody could approve them any more - requests for a subscription and
+//     requests to give a licence back alike;
 //   - an active admin is always left: blocking someone or changing their
 //     role waits on adminsLock for any other such change, then checks.
 //     Two admins blocking each other at once: the second one fails.
 //
 // Lock order: adminsLock (taken by nothing else), the requests, then the
-// user, then their subscriptions and assignments - the order a decision on a
-// request takes them in (the request, then the requester when the licence is
-// handed out). A department's new head is locked the same way: the user
-// before the department.
+// user, then their subscriptions, assignments and release requests - the
+// order a decision on a request takes them in (the request, then the
+// requester when the licence is handed out), and the subscription store's
+// (a subscription before its licences and release requests). A
+// department's new head is locked the same way: the user before the
+// department.
 //
 // Errors:
 //   - errLastAdmin when no active admin would be left.
@@ -289,6 +295,15 @@ func (s *Store) Update(ctx context.Context, id int64, p domain.UserPatch, actorI
 		if err != nil {
 			return domain.User{}, Undone{}, pg.Translate(ctx, "update user revoke licences", err)
 		}
+		// After revokeLicences: their subscriptions are held, so nobody
+		// decides these meanwhile.
+		tag, err := tx.Exec(ctx, `
+			UPDATE subtrack.release_requests SET status = 'cancelled', updated_at = NOW()
+			WHERE requester_id = $1 AND status = 'pending'`, u.ID)
+		if err != nil {
+			return domain.User{}, Undone{}, pg.Translate(ctx, "update user cancel release requests", err)
+		}
+		undone.ReleasesCancelled = tag.RowsAffected()
 	}
 	if mayDropAdmin {
 		var left bool

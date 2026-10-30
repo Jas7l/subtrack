@@ -3,6 +3,7 @@ package subscription
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"subtrack/internal/apperr"
 	"subtrack/internal/auth"
@@ -36,6 +37,11 @@ var (
 	// ErrAlreadyRevoked is returned when the licence was revoked before.
 	// Mapped to 409.
 	ErrAlreadyRevoked = apperr.New(apperr.ErrConflict, "service: the licence is already revoked")
+
+	// ErrRevokeForbidden is returned when the holder of a licence revokes it
+	// without managing the subscription: they file a release request
+	// instead. Mapped to 403.
+	ErrRevokeForbidden = fmt.Errorf("%w: only the admin or a manager of the subscription's department revokes a licence; file a release request to give it back", auth.ErrForbidden)
 )
 
 // GetAssignment returns one assignment as actor is allowed to see it: the
@@ -139,12 +145,16 @@ func (s *Service) Assign(ctx context.Context, actor domain.User, subID, userID i
 	return a, nil
 }
 
-// Revoke ends a licence on behalf of actor and frees its seat. Whoever may
-// see the assignment may revoke it: the admin, the manager of the
-// subscription's department, and the holder giving it back.
+// Revoke ends a licence on behalf of actor and frees its seat. Whoever
+// manages the subscription may: the admin and a manager of its department,
+// their own licence included. Anybody else who holds it files a release
+// request. A request of the holder that waits is closed as approved by actor,
+// in the same transaction.
 //
 // Errors:
 //   - ErrAssignmentNotFound when it does not exist or is outside actor's view.
+//   - ErrRevokeForbidden when actor sees it (holds it) but does not manage
+//     the subscription.
 //   - ErrAlreadyRevoked when it was revoked before.
 //   - any other datastore failure, propagated.
 func (s *Service) Revoke(ctx context.Context, actor domain.User, id int64) (domain.Assignment, error) {
@@ -152,6 +162,9 @@ func (s *Service) Revoke(ctx context.Context, actor domain.User, id int64) (doma
 	a, err := s.GetAssignment(ctx, actor, id)
 	if err != nil {
 		return domain.Assignment{}, err
+	}
+	if !manages(actor, a.SubscriptionDepartmentID) {
+		return domain.Assignment{}, ErrRevokeForbidden
 	}
 	if a.Status == domain.AssignmentRevoked {
 		return domain.Assignment{}, ErrAlreadyRevoked
@@ -163,9 +176,16 @@ func (s *Service) Revoke(ctx context.Context, actor domain.User, id int64) (doma
 		if err != nil {
 			return err
 		}
-		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "assignment.revoke", "assignment", id,
-			map[string]any{"subscription_id": out.SubscriptionID, "subscription": out.SubscriptionName,
-				"user_id": out.UserID, "user": out.UserName}))
+		details := map[string]any{"subscription_id": out.SubscriptionID, "subscription": out.SubscriptionName,
+			"user_id": out.UserID, "user": out.UserName}
+		closed, err := s.closeReleases(ctx, actor, out.SubscriptionID)
+		if err != nil {
+			return err
+		}
+		if closed > 0 {
+			details["release_requests_closed"] = closed
+		}
+		return s.audit.Record(ctx, domain.NewAuditEntry(actor.ID, "assignment.revoke", "assignment", id, details))
 	})
 	if errors.Is(err, storage.ErrNotFound) {
 		// Revoked by someone else (or with the whole subscription) meanwhile.

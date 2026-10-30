@@ -2,6 +2,7 @@ package subscription
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -12,19 +13,22 @@ import (
 	"subtrack/internal/testkit"
 )
 
-// fakeRepo is an in-memory subscriptions + assignments store with the rules
-// the service relies on: soft delete, the seats CHECK, one active licence per
-// (subscription, user), revoke-all on cancel and delete, and the visibility
+// fakeRepo is an in-memory subscriptions + assignments + release requests
+// store with the rules the service relies on: soft delete, the seats CHECK,
+// one active licence per (subscription, user), revoke-all on cancel and
+// delete, one pending release request per licence, and the visibility
 // scope. Locking is not modelled.
 type fakeRepo struct {
 	mu         sync.Mutex
 	subs       map[int64]domain.Subscription
 	deleted    map[int64]bool
 	asg        map[int64]domain.Assignment
+	rel        map[int64]domain.ReleaseRequest
 	currencies map[string]bool
 	users      fakeUsers
 	nextSub    int64
 	nextAsg    int64
+	nextRel    int64
 }
 
 func newFakeRepo(users fakeUsers) *fakeRepo {
@@ -32,10 +36,12 @@ func newFakeRepo(users fakeUsers) *fakeRepo {
 		subs:       map[int64]domain.Subscription{},
 		deleted:    map[int64]bool{},
 		asg:        map[int64]domain.Assignment{},
+		rel:        map[int64]domain.ReleaseRequest{},
 		currencies: map[string]bool{"RUB": true, "USD": true},
 		users:      users,
 		nextSub:    1,
 		nextAsg:    1,
+		nextRel:    1,
 	}
 }
 
@@ -160,8 +166,20 @@ func (f *fakeRepo) GetAssignment(_ context.Context, id int64) (domain.Assignment
 	if !ok {
 		return domain.Assignment{}, storage.ErrNotFound
 	}
+	return f.fill(a), nil
+}
+
+// fill sets what the store's reads join in: the subscription's department
+// and the release request that waits.
+func (f *fakeRepo) fill(a domain.Assignment) domain.Assignment {
 	a.SubscriptionDepartmentID = f.subs[a.SubscriptionID].DepartmentID
-	return a, nil
+	a.ReleaseRequestID = nil
+	for id, r := range f.rel {
+		if r.AssignmentID == a.ID && r.Status == domain.ReleasePending {
+			a.ReleaseRequestID = &id
+		}
+	}
+	return a
 }
 
 func (f *fakeRepo) HasActiveAssignment(_ context.Context, subID, userID int64) (bool, error) {
@@ -179,7 +197,7 @@ func (f *fakeRepo) ListAssignments(_ context.Context, flt domain.AssignmentFilte
 		if !ok {
 			continue
 		}
-		a.SubscriptionDepartmentID = f.subs[a.SubscriptionID].DepartmentID
+		a = f.fill(a)
 		switch {
 		case !inScope(sc, a.SubscriptionDepartmentID, sc != nil && sc.HolderID != nil && a.UserID == *sc.HolderID):
 		case flt.SubscriptionID != nil && a.SubscriptionID != *flt.SubscriptionID:
@@ -237,7 +255,196 @@ func (f *fakeRepo) Revoke(_ context.Context, id, actorID int64) (domain.Assignme
 	s := f.subs[a.SubscriptionID]
 	s.SeatsUsed--
 	f.subs[a.SubscriptionID] = s
-	return a, nil
+	return f.fill(a), nil
+}
+
+// release returns r with what the store's reads join in, as of now.
+func (f *fakeRepo) release(r domain.ReleaseRequest) domain.ReleaseRequest {
+	a := f.asg[r.AssignmentID]
+	s := f.subs[a.SubscriptionID]
+	r.SubscriptionID, r.SubscriptionName, r.DepartmentID = s.ID, s.Name, s.DepartmentID
+	r.RequesterName = f.users[r.RequesterID].FullName
+	r.DecidedByName = nil
+	if r.DecidedBy != nil {
+		name := f.users[*r.DecidedBy].FullName
+		r.DecidedByName = &name
+	}
+	return r
+}
+
+func (f *fakeRepo) GetRelease(_ context.Context, id int64) (domain.ReleaseRequest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.rel[id]
+	if !ok {
+		return domain.ReleaseRequest{}, storage.ErrNotFound
+	}
+	return f.release(r), nil
+}
+
+func (f *fakeRepo) LockRelease(ctx context.Context, id int64) (domain.ReleaseRequest, error) {
+	return f.GetRelease(ctx, id)
+}
+
+// attended reports whether department dept has an active manager.
+func (f *fakeRepo) attended(dept *int64) bool {
+	if dept == nil {
+		return false
+	}
+	for _, u := range f.users {
+		if u.Role == domain.RoleManager && u.IsActive && u.DepartmentID != nil && *u.DepartmentID == *dept {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fakeRepo) ListReleases(_ context.Context, flt domain.ReleaseFilter, sc *domain.SubscriptionScope, limit, offset int) ([]domain.ReleaseRequest, int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []domain.ReleaseRequest
+	for id := f.nextRel - 1; id >= 1; id-- {
+		r, ok := f.rel[id]
+		if !ok {
+			continue
+		}
+		r = f.release(r)
+		switch {
+		case !inScope(sc, r.DepartmentID, sc != nil && sc.HolderID != nil && r.RequesterID == *sc.HolderID):
+		case flt.Status != nil && r.Status != *flt.Status:
+		case flt.RequesterID != nil && r.RequesterID != *flt.RequesterID:
+		case flt.SubscriptionID != nil && r.SubscriptionID != *flt.SubscriptionID:
+		case flt.DepartmentID != nil && (r.DepartmentID == nil || *r.DepartmentID != *flt.DepartmentID):
+		case flt.Unattended && f.attended(r.DepartmentID):
+		default:
+			out = append(out, r)
+		}
+	}
+	total := int64(len(out))
+	out = out[min(offset, len(out)):]
+	return out[:min(limit, len(out))], total, nil
+}
+
+func (f *fakeRepo) CreateRelease(_ context.Context, r domain.ReleaseRequest) (domain.ReleaseRequest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	a, ok := f.asg[r.AssignmentID]
+	if !ok || a.Status != domain.AssignmentActive || a.UserID != r.RequesterID {
+		return domain.ReleaseRequest{}, errLicenceGone
+	}
+	for _, other := range f.rel {
+		if other.AssignmentID == r.AssignmentID && other.Status == domain.ReleasePending {
+			return domain.ReleaseRequest{}, &storage.ConstraintError{Constraint: "release_requests_pending_key"}
+		}
+	}
+	r.ID = f.nextRel
+	f.nextRel++
+	r.Status = domain.ReleasePending
+	r.CreatedAt, r.UpdatedAt = time.Now(), time.Now()
+	f.rel[r.ID] = r
+	return f.release(r), nil
+}
+
+func (f *fakeRepo) DecideRelease(_ context.Context, id int64, d domain.ReleaseDecision) (domain.ReleaseRequest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.rel[id]
+	if !ok || r.Status != domain.ReleasePending {
+		return domain.ReleaseRequest{}, storage.ErrNotFound
+	}
+	now := time.Now()
+	r.Status = domain.ReleaseRejected
+	if d.Approve {
+		r.Status = domain.ReleaseApproved
+	}
+	r.DecidedBy, r.Comment, r.DecidedAt, r.UpdatedAt = &d.ReviewerID, d.Comment, &now, now
+	f.rel[id] = r
+	return f.release(r), nil
+}
+
+func (f *fakeRepo) CancelRelease(_ context.Context, id, requesterID int64) (domain.ReleaseRequest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.rel[id]
+	if !ok || r.RequesterID != requesterID || r.Status != domain.ReleasePending {
+		return domain.ReleaseRequest{}, storage.ErrNotFound
+	}
+	r.Status, r.UpdatedAt = domain.ReleaseCancelled, time.Now()
+	f.rel[id] = r
+	return f.release(r), nil
+}
+
+func (f *fakeRepo) CloseReleases(_ context.Context, subID, actorID int64) ([]domain.ReleaseRequest, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []domain.ReleaseRequest
+	for id := int64(1); id < f.nextRel; id++ {
+		r, ok := f.rel[id]
+		if !ok || r.Status != domain.ReleasePending {
+			continue
+		}
+		a := f.asg[r.AssignmentID]
+		if a.SubscriptionID != subID || a.Status != domain.AssignmentRevoked {
+			continue
+		}
+		now := time.Now()
+		r.Status, r.DecidedBy, r.DecidedAt, r.UpdatedAt = domain.ReleaseApproved, &actorID, &now, now
+		f.rel[id] = r
+		out = append(out, f.release(r))
+	}
+	return out, nil
+}
+
+// fakeNotify keeps what was sent: to one user, to the managers of a
+// department (as many entries as it has active managers), to every admin
+// (one entry with UserID 0).
+type fakeNotify struct {
+	mu    sync.Mutex
+	users fakeUsers
+	sent  []domain.Notification
+}
+
+func (f *fakeNotify) Send(_ context.Context, n domain.Notification) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, n)
+	return nil
+}
+
+func (f *fakeNotify) SendToAdmins(_ context.Context, n domain.Notification) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n.UserID = 0
+	f.sent = append(f.sent, n)
+	return nil
+}
+
+func (f *fakeNotify) SendToManagers(_ context.Context, deptID int64, n domain.Notification) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var count int64
+	for id := int64(1); id <= int64(len(f.users))+10; id++ {
+		u, ok := f.users[id]
+		if ok && u.Role == domain.RoleManager && u.IsActive && u.DepartmentID != nil && *u.DepartmentID == deptID {
+			n.UserID = id
+			f.sent = append(f.sent, n)
+			count++
+		}
+	}
+	return count, nil
+}
+
+// take returns what was sent since the last call, as "type→user" with
+// user 0 for the admins, and forgets it.
+func (f *fakeNotify) take() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]string, 0, len(f.sent))
+	for _, n := range f.sent {
+		out = append(out, string(n.Type)+"→"+strconv.FormatInt(n.UserID, 10))
+	}
+	f.sent = nil
+	return out
 }
 
 // fakeUsers is a fixed set of users.
@@ -276,6 +483,7 @@ func day(s string) time.Time {
 type fixture struct {
 	repo                         *fakeRepo
 	audit                        *testkit.Audit
+	notify                       *fakeNotify
 	svc                          *Service
 	admin, mgr, emp, emp2, out   domain.User
 	blocked, mgrDesign, homeless domain.User
@@ -302,7 +510,8 @@ func newFixture(t *testing.T) fixture {
 	}
 	f.repo = newFakeRepo(users)
 	f.audit = &testkit.Audit{}
-	f.svc = New(f.repo, users, fakeDepts{dev: true, design: true}, &testkit.Tx{}, f.audit, time.UTC)
+	f.notify = &fakeNotify{users: users}
+	f.svc = New(f.repo, users, fakeDepts{dev: true, design: true}, &testkit.Tx{}, f.audit, f.notify, time.UTC)
 	return f
 }
 
