@@ -5,12 +5,14 @@ import { errorText } from '../lib/errors'
 import { useAuth } from './AuthContext'
 
 // RequireAuth lets through only a signed-in user whose profile is loaded;
-// otherwise it sends to /login and remembers where the user was going.
+// otherwise it sends to /login and remembers where the user was going —
+// except after «Выйти»: the next one to sign in starts from their home page.
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { token, me, loading, error } = useAuth()
+  const { token, me, loading, error, signedOut } = useAuth()
   const location = useLocation()
 
   if (!token) {
+    if (signedOut) return <Navigate to="/login" replace />
     const next = encodeURIComponent(location.pathname + location.search)
     return <Navigate to={`/login?next=${next}`} replace />
   }

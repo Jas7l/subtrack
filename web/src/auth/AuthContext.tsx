@@ -15,6 +15,9 @@ interface AuthState {
   departmentLoading: boolean
   loading: boolean
   error: unknown
+  // The user pressed «Выйти» in this tab: whoever signs in next may be
+  // someone else, so the login page does not return them to that page.
+  signedOut: boolean
   login: (email: string, password: string) => Promise<MeDTO>
   logout: () => void
 }
@@ -24,6 +27,7 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [token, setToken] = useState(tokenStore.get)
+  const [signedOut, setSignedOut] = useState(false)
 
   // A stored token is checked with /auth/me; a 401 there sends the user to
   // the login page (api/client.ts), so expiry needs no timer.
@@ -50,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenStore.set(res.token)
       queryClient.setQueryData(['auth', 'me', res.token], res.user)
       setToken(res.token)
+      setSignedOut(false)
       return res.user
     },
     [queryClient],
@@ -58,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     tokenStore.clear()
     setToken(null)
+    setSignedOut(true)
     queryClient.clear()
   }, [queryClient])
 
@@ -70,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       departmentLoading: departmentId !== null && departmentQuery.isPending,
       loading: token !== null && meQuery.isPending,
       error: meQuery.error,
+      signedOut,
       login,
       logout,
     }),
@@ -81,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       departmentQuery.isPending,
       meQuery.isPending,
       meQuery.error,
+      signedOut,
       login,
       logout,
     ],
